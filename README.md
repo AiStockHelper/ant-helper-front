@@ -1,70 +1,33 @@
-# Getting Started with Create React App
+# Ant Helper Web
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+채팅 중심 주식 어시스턴트 프론트엔드. Vite + React 18 + TypeScript(strict) + Tailwind 3 + react-router v6 + TanStack Query.
+API 계약은 `../docs/DESIGN.md` 를 따른다.
 
-## Available Scripts
+## 실행
 
-In the project directory, you can run:
+```bash
+npm install
+npm run dev        # http://localhost:3000, /api -> http://localhost:8080 프록시, 같은 네트워크의 휴대폰에서도 접속 가능
+npm run build      # tsc --noEmit && vite build
+npm run test       # vitest (SSE 파서, 포맷 유틸)
+npm run icons      # public/icons/*.png 재생성 (public/icon.svg 와 같은 도형)
+```
 
-### `npm start`
+모든 화면은 실제 백엔드(`/api`)와만 통신한다. 채팅 답변은 백엔드가 실제 LLM(GPT, 실패 시 Claude)으로 생성한 것만 표시한다.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+## 환경변수
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+| 이름 | 기본값 | 설명 |
+|------|--------|------|
+| `VITE_API_BASE_URL` | `''` | 비우면 Vite proxy 사용 |
+| `VITE_PROXY_TARGET` | `http://localhost:8080` | dev 서버가 `/api` 를 넘길 백엔드 주소 |
 
-### `npm test`
+## 구조
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
-
-### `npm run build`
-
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
-
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
-
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
-
-### `npm run eject`
-
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
-
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
-
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+```
+src/
+  api/        client.ts(fetch 래퍼·토큰·401 refresh 1회), sse.ts(POST SSE 파서), endpoints.ts, types.ts(DESIGN.md 타입)
+  components/ AppShell, AccountSelect, ui/(Button, Dialog, Popover, Toast, ...), finance/(목록·도넛 등)
+  features/   auth, chat(useChat 스트리밍 상태, 카드, 확인 카드), portfolio, accounts, settings
+  lib/        format.ts(formatKRW, formatRate ...), clipboard, cn
+```

@@ -1,0 +1,18 @@
+{
+  "name": "Ant Helper · 개미 헬퍼",
+  "short_name": "Ant Helper",
+  "description": "채팅으로 시세 조회, 예측, 주문, 예약 주문까지. 주식 AI 어시스턴트",
+  "lang": "ko",
+  "start_url": "/chat",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b0d12",
+  "theme_color": "#7c3aed",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

@@ -2,15 +2,310 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-    background-color: white;
-    font-family: 'Goorm Sans', sans-serif;
+/* 디자인 토큰 (RGB 채널). 라이트 기본, .dark 에서 덮어쓴다. */
+:root {
+  --bg: 247 248 250;
+  --surface: 255 255 255;
+  --surface-2: 241 243 246;
+  --surface-3: 230 233 239;
+  --border: 228 231 236;
+  --border-strong: 205 210 219;
+
+  --fg: 17 24 39;
+  --fg-muted: 75 85 99;
+  --fg-subtle: 107 114 128;
+
+  --brand: 124 58 237;
+  --brand-hover: 109 40 217;
+  --brand-soft: 243 238 255;
+  --brand-fg: 255 255 255;
+  --brand-text: 109 40 217;
+
+  --up: 220 38 38;
+  --up-soft: 254 236 236;
+  --down: 37 99 235;
+  --down-soft: 230 238 254;
+
+  --real: 194 65 12;
+  --real-soft: 255 237 213;
+  --real-solid: 234 88 12;
+  --paper: 15 118 110;
+  --paper-soft: 204 246 238;
+
+  --success: 21 128 61;
+  --success-soft: 220 252 231;
+  --danger: 185 28 28;
+  --danger-soft: 254 226 226;
+  --warning: 161 98 7;
+  --warning-soft: 254 243 199;
+
+  --chart-1: 124 58 237;
+  --chart-2: 14 165 233;
+  --chart-3: 16 185 129;
+  --chart-4: 245 158 11;
+  --chart-5: 236 72 153;
+  --chart-6: 99 102 241;
+  --chart-7: 132 204 22;
+  --chart-8: 148 163 184;
+
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-top: env(safe-area-inset-top, 0px);
 }
 
-/* @font-face {
-  font-family: "Goorm Sans";
-  src: url("https://statics.goorm.io/fonts/GoormSans/v1.0.0/GoormSans.min.css")
-    format("woff2");
-  font-weight: normal;
-  font-style: normal;
-} */
+.dark {
+  --bg: 11 13 18;
+  --surface: 20 23 30;
+  --surface-2: 29 33 42;
+  --surface-3: 40 45 57;
+  --border: 38 43 54;
+  --border-strong: 58 65 80;
+
+  --fg: 236 238 242;
+  --fg-muted: 160 167 180;
+  --fg-subtle: 126 133 148;
+
+  --brand: 124 58 237;
+  --brand-hover: 139 92 246;
+  --brand-soft: 36 28 62;
+  --brand-fg: 255 255 255;
+  --brand-text: 177 151 252;
+
+  --up: 248 113 113;
+  --up-soft: 63 25 29;
+  --down: 96 165 250;
+  --down-soft: 24 40 66;
+
+  --real: 251 146 60;
+  --real-soft: 67 30 8;
+  --real-solid: 234 88 12;
+  --paper: 45 212 191;
+  --paper-soft: 10 52 49;
+
+  --success: 74 222 128;
+  --success-soft: 14 50 28;
+  --danger: 248 113 113;
+  --danger-soft: 66 22 26;
+  --warning: 251 191 36;
+  --warning-soft: 58 44 8;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    word-break: keep-all;
+    overflow-wrap: anywhere;
+    @apply bg-bg font-sans text-fg antialiased;
+    overscroll-behavior-y: none;
+  }
+  :focus-visible {
+    outline: 2px solid rgb(var(--brand));
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+  button,
+  [role='button'],
+  a {
+    touch-action: manipulation;
+  }
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+  @media (min-width: 769px) {
+    input,
+    textarea,
+    select {
+      font-size: 14px;
+    }
+  }
+  ::selection {
+    background: rgb(var(--brand) / 0.25);
+  }
+}
+
+@layer utilities {
+  .pb-safe {
+    padding-bottom: var(--safe-bottom);
+  }
+  .pt-safe {
+    padding-top: var(--safe-top);
+  }
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(var(--border-strong)) transparent;
+  }
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: rgb(var(--surface-3));
+  border-radius: 8px;
+}
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgb(var(--surface) / 0.55), transparent);
+  animation: shimmer 1.4s infinite;
+}
+
+/* 모바일에서 입력창에 포커스가 있으면(키보드 표시) 하단 탭바를 숨겨 화면을 확보 */
+@media (max-width: 768px) {
+  body:has(.composer-input:focus) .mobile-tabbar {
+    display: none;
+  }
+}
+
+/* ── 마크다운 ─────────────────────────────── */
+.md {
+  font-size: 15px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.md > *:first-child {
+  margin-top: 0;
+}
+.md > *:last-child {
+  margin-bottom: 0;
+}
+.md p {
+  margin: 0.6em 0;
+}
+.md h1,
+.md h2,
+.md h3,
+.md h4 {
+  font-weight: 700;
+  line-height: 1.4;
+  margin: 1.2em 0 0.5em;
+}
+.md h1 {
+  font-size: 1.3em;
+}
+.md h2 {
+  font-size: 1.18em;
+}
+.md h3,
+.md h4 {
+  font-size: 1.05em;
+}
+.md ul,
+.md ol {
+  margin: 0.6em 0;
+  padding-left: 1.4em;
+}
+.md ul {
+  list-style: disc;
+}
+.md ol {
+  list-style: decimal;
+}
+.md li {
+  margin: 0.25em 0;
+}
+.md li::marker {
+  color: rgb(var(--fg-subtle));
+}
+.md a {
+  color: rgb(var(--brand-text));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.md blockquote {
+  margin: 0.8em 0;
+  padding: 0.1em 0 0.1em 0.9em;
+  border-left: 3px solid rgb(var(--border-strong));
+  color: rgb(var(--fg-muted));
+}
+.md hr {
+  border: 0;
+  border-top: 1px solid rgb(var(--border));
+  margin: 1.2em 0;
+}
+.md :not(pre) > code {
+  font-family: theme('fontFamily.mono');
+  font-size: 0.88em;
+  padding: 0.15em 0.4em;
+  border-radius: 6px;
+  background: rgb(var(--surface-3));
+}
+.md pre {
+  margin: 0;
+  padding: 0.9em 1em;
+  overflow-x: auto;
+  font-size: 13px;
+  line-height: 1.6;
+  font-family: theme('fontFamily.mono');
+}
+.md .table-wrap {
+  margin: 0.8em 0;
+  overflow-x: auto;
+  border: 1px solid rgb(var(--border));
+  border-radius: 10px;
+}
+.md table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.md th,
+.md td {
+  padding: 0.5em 0.8em;
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: 1px solid rgb(var(--border));
+}
+.md th {
+  background: rgb(var(--surface-2));
+  font-weight: 600;
+}
+.md tr:last-child td {
+  border-bottom: 0;
+}
+.md-streaming > *:last-child::after,
+.md-caret::after {
+  content: '';
+  display: inline-block;
+  width: 0.5em;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  border-radius: 2px;
+  background: rgb(var(--brand));
+  animation: caret 1s steps(1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .skeleton::after {
+    display: none;
+  }
+}
