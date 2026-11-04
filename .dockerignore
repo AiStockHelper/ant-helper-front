@@ -1,0 +1,10 @@
+node_modules
+dist
+.git
+.github
+.idea
+.screenshots
+.env.local
+*.local
+Dockerfile
+.dockerignore
