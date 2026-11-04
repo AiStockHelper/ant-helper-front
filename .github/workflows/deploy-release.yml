@@ -1,4 +1,4 @@
-name: Deploy frontend (release → S3)
+name: Deploy frontend (release → EC2 nginx)
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: deploy-release
+  group: deploy-frontend
   cancel-in-progress: false
 
 permissions:
@@ -16,62 +16,102 @@ permissions:
 
 jobs:
   build:
-    name: Build in Docker
+    name: Test & build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - uses: docker/setup-buildx-action@v3
-
-      # Dockerfile 안에서 npm ci → vitest → tsc + vite build 를 수행하고 dist 만 꺼낸다.
-      - name: Build dist
-        uses: docker/build-push-action@v6
+      - uses: actions/setup-node@v4
         with:
-          context: .
-          target: dist
-          outputs: type=local,dest=dist
-          build-args: |
-            VITE_API_BASE_URL=${{ secrets.VITE_API_BASE_URL }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          node-version: "20"
+          cache: npm
 
-      - name: Check build output
-        run: test -f dist/index.html && ls -lh dist
+      - run: npm ci
+      - run: npm test
+      # VITE_API_BASE_URL 을 비워 둔다: 같은 출처의 /api 로 호출하고 nginx 가 백엔드(8080)로 프록시한다.
+      - run: npm run build
+
+      - name: Package dist
+        run: |
+          test -f dist/index.html
+          tar -czf frontend-dist.tgz -C dist .
 
       - uses: actions/upload-artifact@v4
         if: github.event_name != 'pull_request'
         with:
           name: frontend-dist
-          path: dist
-          retention-days: 7
+          path: frontend-dist.tgz
+          retention-days: 3
           if-no-files-found: error
 
   deploy:
-    name: Deploy to S3
+    name: Deploy to EC2
     needs: build
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      id-token: write
+      contents: read
     env:
-      S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
+      EC2_HOST: ${{ vars.EC2_HOST }}
+      EC2_USER: ${{ vars.EC2_USER }}
+      EC2_SG_ID: ${{ vars.EC2_SG_ID }}
+      EC2_HOST_KEY: ${{ vars.EC2_HOST_KEY }}
+      EC2_KEY: ${{ secrets.EC2_KEY }}
     steps:
+      - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
           name: frontend-dist
-          path: dist
 
-      - name: Check required secrets
-        run: |
-          [ -n "$S3_BUCKET_NAME" ] || { echo "::error::GitHub secret 'S3_BUCKET_NAME' is not set"; exit 1; }
-
-      - uses: aws-actions/configure-aws-credentials@v4
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
 
-      # 새 해시 파일을 먼저 올리고 → index.html 교체 → 안 쓰는 옛 파일 삭제 순서로, 중간에 깨진 화면이 뜨지 않게 한다.
-      - name: Sync to S3
+      - name: Prepare SSH
         run: |
-          aws s3 sync dist "s3://$S3_BUCKET_NAME" --exclude index.html
-          aws s3 cp dist/index.html "s3://$S3_BUCKET_NAME/index.html" --cache-control no-store
-          aws s3 sync dist "s3://$S3_BUCKET_NAME" --delete --exclude index.html
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$EC2_KEY" > ~/.ssh/ec2_key
+          chmod 600 ~/.ssh/ec2_key
+          printf '%s %s\n' "$EC2_HOST" "$EC2_HOST_KEY" > ~/.ssh/known_hosts
+          cat > ~/.ssh/config <<EOF
+          Host ec2
+            HostName $EC2_HOST
+            User $EC2_USER
+            IdentityFile ~/.ssh/ec2_key
+            IdentitiesOnly yes
+            ConnectTimeout 20
+            ServerAliveInterval 15
+            ServerAliveCountMax 12
+          EOF
+          chmod 600 ~/.ssh/config
+
+      # 보안그룹의 22번 포트는 고정 IP 에만 열려 있다. 이 러너의 IP 만 배포 동안 열고 항상 닫는다.
+      - name: Open SSH for this runner
+        id: sg
+        run: |
+          ip="$(curl -fsS https://checkip.amazonaws.com | tr -d '[:space:]')"
+          echo "ip=$ip" >> "$GITHUB_OUTPUT"
+          if ! out="$(aws ec2 authorize-security-group-ingress --group-id "$EC2_SG_ID" \
+              --ip-permissions "IpProtocol=tcp,FromPort=22,ToPort=22,IpRanges=[{CidrIp=${ip}/32,Description=gha-${GITHUB_REPOSITORY#*/}-${GITHUB_RUN_ID}}]" 2>&1)"; then
+            echo "$out"; grep -q 'InvalidPermission.Duplicate' <<< "$out" || exit 1
+          fi
+          for i in $(seq 1 12); do ssh ec2 true && exit 0; sleep 5; done
+          echo "::error::cannot reach EC2 over SSH"; exit 1
+
+      - name: Upload dist
+        run: scp frontend-dist.tgz ec2:/tmp/frontend-dist.tgz
+
+      - name: Swap into nginx root & smoke test
+        run: ssh ec2 'bash -s' < .github/scripts/remote-deploy.sh
+
+      - name: Close SSH for this runner
+        if: always() && steps.sg.outputs.ip != ''
+        run: |
+          aws ec2 revoke-security-group-ingress --group-id "$EC2_SG_ID" \
+            --ip-permissions "IpProtocol=tcp,FromPort=22,ToPort=22,IpRanges=[{CidrIp=${{ steps.sg.outputs.ip }}/32}]" >/dev/null || true
+          rm -f ~/.ssh/ec2_key
