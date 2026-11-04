@@ -5,7 +5,6 @@ import {
   Bot,
   BrainCircuit,
   Ban,
-  CalendarClock,
   CheckCircle2,
   Coins,
   LineChart,
@@ -19,7 +18,7 @@ import {
 import { cn } from '@/lib/cn'
 import { Badge } from '@/components/ui/Badge'
 import { currencyOf, formatAmount, formatDateTime, formatMoney, formatNumber, formatVolume, priceTone, toneClass } from '@/lib/format'
-import { HoldingsList, OrderList, ScheduledTaskList } from '@/components/finance/Lists'
+import { HoldingsList, OrderList } from '@/components/finance/Lists'
 import { DirectionBadge, MarketBadge, PriceChange, SideBadge, Stat } from '@/components/finance/parts'
 import { SectionTitle, SummaryBlock } from '@/components/finance/Summary'
 import { AgentTaskList } from '@/features/agent/AgentTasks'
@@ -37,7 +36,6 @@ import type {
   Prediction,
   Quote,
   Recommendation,
-  ScheduledTask,
   StockSearchItem,
 } from '@/api/types'
 
@@ -423,14 +421,6 @@ function OrderResultCard({ data }: { data: OrderResultData }) {
   )
 }
 
-function ScheduledTasksCard({ data }: { data: ScheduledTask[] }) {
-  return (
-    <CardShell icon={<CalendarClock className="h-4 w-4" />} title={`예약 작업 ${data.length}건`} flush>
-      <ScheduledTaskList tasks={data} showAccount />
-    </CardShell>
-  )
-}
-
 function LlmPicksCard({ data }: { data: LlmPicksData }) {
   const { sendMessage, busy } = useChatUi()
   const picks = data?.picks ?? []
@@ -534,8 +524,6 @@ function renderCard(card: Card) {
       return <LlmPicksCard data={d as LlmPicksData} />
     case 'agent_tasks':
       return <AgentTasksCard data={(d ?? []) as AgentTask[]} />
-    case 'scheduled_tasks':
-      return <ScheduledTasksCard data={(d ?? []) as ScheduledTask[]} />
     default:
       return null
   }

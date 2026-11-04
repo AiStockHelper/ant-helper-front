@@ -1,10 +1,7 @@
-import { X } from 'lucide-react'
-import { Button } from '@/components/ui/Button'
-import { AccountTypeBadge } from '@/components/ui/Badge'
 import { cn } from '@/lib/cn'
 import { currencyOf, formatDateTime, formatMoney, formatNumber, formatRate, priceTone, toneClass } from '@/lib/format'
-import type { Holding, OrderHistoryItem, ScheduledTask } from '@/api/types'
-import { MarketBadge, OrderStatusBadge, PnL, SideBadge, TaskStatusBadge } from './parts'
+import type { Holding, OrderHistoryItem } from '@/api/types'
+import { MarketBadge, OrderStatusBadge, PnL, SideBadge } from './parts'
 
 function StockName({ name, market, code }: { name: string; market?: string; code: string }) {
   return (
@@ -165,44 +162,5 @@ export function OrderList({ orders, className }: { orders: OrderHistoryItem[]; c
         ))}
       </ul>
     </div>
-  )
-}
-
-/** 예약 작업 리스트. onCancel 이 있으면 SCHEDULED 항목에 취소 버튼 */
-export function ScheduledTaskList({
-  tasks,
-  onCancel,
-  showAccount,
-}: {
-  tasks: ScheduledTask[]
-  onCancel?: (task: ScheduledTask) => void
-  showAccount?: boolean
-}) {
-  if (tasks.length === 0) {
-    return <p className="px-4 py-8 text-center text-sm text-muted">예약된 작업이 없습니다.</p>
-  }
-  return (
-    <ul className="divide-y divide-border">
-      {tasks.map((t) => (
-        <li key={t.id} className="flex items-start gap-3 px-4 py-3.5">
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <TaskStatusBadge status={t.status} />
-              {showAccount && <AccountTypeBadge type={t.accountType} />}
-              {typeof t.params?.market === 'string' && <MarketBadge market={t.params.market} />}
-              <span className="tabular text-xs text-subtle">{formatDateTime(t.runAt)} 실행</span>
-            </div>
-            <p className="mt-1.5 text-sm font-semibold">{t.title}</p>
-            {t.resultMessage && <p className="mt-0.5 text-xs text-muted">{t.resultMessage}</p>}
-          </div>
-          {onCancel && t.status === 'SCHEDULED' && (
-            <Button variant="outline" size="sm" onClick={() => onCancel(t)} aria-label={`${t.title} 예약 취소`}>
-              <X className="h-3.5 w-3.5" aria-hidden />
-              취소
-            </Button>
-          )}
-        </li>
-      ))}
-    </ul>
   )
 }
