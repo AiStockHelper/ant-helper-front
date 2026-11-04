@@ -224,7 +224,6 @@ export type CardType =
   | 'holdings'
   | 'orders'
   | 'order_result'
-  | 'scheduled_tasks'
   | 'agent_tasks'
   | 'llm_recommendations'
 
@@ -452,23 +451,6 @@ export interface CreateAgentTaskRequest {
   config: Record<string, unknown>
   confirmRealTrading?: boolean
 }
-/** 이전 예약 방식으로 남은 채팅 카드를 그리기 위한 타입 */
-export type ScheduledTaskStatus = 'SCHEDULED' | 'RUNNING' | 'DONE' | 'FAILED' | 'CANCELED'
-
-export interface ScheduledTask {
-  id: number
-  accountId: number
-  accountType: AccountType
-  kind: 'ORDER' | 'RECOMMEND_BUY'
-  title: string
-  runAt: string
-  status: ScheduledTaskStatus
-  params: Record<string, unknown>
-  resultMessage?: string
-  executedAt?: string
-  createdAt: string
-}
-
 // ── SSE ───────────────────────────────────────────
 export interface MetaEventData {
   conversation: Conversation

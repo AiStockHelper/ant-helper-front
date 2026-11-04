@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { cn } from '@/lib/cn'
 import { Badge } from '@/components/ui/Badge'
 import { formatMoney, formatRate, formatSignedAmount, marketOf, priceTone, toneClass, toneSymbol, type CurrencyCode } from '@/lib/format'
-import type { AgentStatus, Direction, OrderSide, OrderStatus, ScheduledTaskStatus } from '@/api/types'
+import type { AgentStatus, Direction, OrderSide, OrderStatus } from '@/api/types'
 
 /** ▲ +1,200 (+1.25%) */
 export function PriceChange({
@@ -83,27 +83,6 @@ export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
   PENDING: '대기',
   CANCELED: '취소',
   REJECTED: '거부',
-}
-
-const taskStatus: Record<ScheduledTaskStatus, { label: string; tone: Parameters<typeof Badge>[0]['tone'] }> = {
-  SCHEDULED: { label: '예약됨', tone: 'brand' },
-  RUNNING: { label: '실행 중', tone: 'warning' },
-  DONE: { label: '완료', tone: 'success' },
-  FAILED: { label: '실패', tone: 'danger' },
-  CANCELED: { label: '취소됨', tone: 'neutral' },
-}
-
-export function TaskStatusBadge({ status }: { status: ScheduledTaskStatus }) {
-  const s = taskStatus[status] ?? { label: status, tone: 'neutral' as const }
-  return <Badge tone={s.tone}>{s.label}</Badge>
-}
-
-export const TASK_STATUS_LABEL: Record<ScheduledTaskStatus, string> = {
-  SCHEDULED: '예약됨',
-  RUNNING: '실행 중',
-  DONE: '완료',
-  FAILED: '실패',
-  CANCELED: '취소됨',
 }
 
 const agentStatus: Record<AgentStatus, { label: string; tone: Parameters<typeof Badge>[0]['tone'] }> = {
