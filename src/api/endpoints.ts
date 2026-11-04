@@ -14,7 +14,10 @@ import type {
   OrderHistoryItem,
   OrderScope,
   PageResponse,
-  ScheduledTask,
+  AgentTask,
+  AgentTaskDetail,
+  CreateAgentTaskRequest,
+  Skill,
 } from './types'
 
 export const authApi = {
@@ -40,17 +43,28 @@ export const accountsApi = {
     ),
 }
 
-export const scheduledApi = {
-  list: (p: { accountId?: number; status?: string } = {}) => {
-    const q = new URLSearchParams()
-    if (p.accountId != null) q.set('accountId', String(p.accountId))
-    if (p.status) q.set('status', p.status)
-    const qs = q.toString()
-    return api.get<ScheduledTask[]>(`/scheduled-tasks${qs ? `?${qs}` : ''}`)
-  },
-  cancel: (id: number) => api.delete<ScheduledTask>(`/scheduled-tasks/${id}`),
+export const skillsApi = {
+  list: () => api.get<Skill[]>('/skills'),
 }
 
+export const agentApi = {
+  list: (p: { accountId?: number; skillId?: string; status?: string } = {}) => {
+    const q = new URLSearchParams()
+    if (p.accountId != null) q.set('accountId', String(p.accountId))
+    if (p.skillId) q.set('skillId', p.skillId)
+    if (p.status) q.set('status', p.status)
+    const qs = q.toString()
+    return api.get<AgentTask[]>(`/agent/tasks${qs ? `?${qs}` : ''}`)
+  },
+  create: (body: CreateAgentTaskRequest) => api.post<AgentTask>('/agent/tasks', body),
+  detail: (id: number) => api.get<AgentTaskDetail>(`/agent/tasks/${id}`),
+  pause: (id: number) => api.post<AgentTask>(`/agent/tasks/${id}/pause`),
+  resume: (id: number) => api.post<AgentTask>(`/agent/tasks/${id}/resume`),
+  runNow: (id: number) => api.post<void>(`/agent/tasks/${id}/run`),
+  liquidate: (id: number) => api.post<{ orders: number; lines: string[] }>(`/agent/tasks/${id}/liquidate`),
+  cancel: (id: number) => api.delete<AgentTask>(`/agent/tasks/${id}`),
+  pauseAll: () => api.post<{ paused: number }>('/agent/pause-all'),
+}
 export const chatApi = {
   conversations: (p: { q?: string; page: number; size: number }) => {
     const q = new URLSearchParams({ page: String(p.page), size: String(p.size) })

@@ -2,6 +2,8 @@ import { Component, useMemo, type ReactNode } from 'react'
 import {
   AlertTriangle,
   BarChart3,
+  Bot,
+  BrainCircuit,
   Ban,
   CalendarClock,
   CheckCircle2,
@@ -20,13 +22,16 @@ import { currencyOf, formatAmount, formatDateTime, formatMoney, formatNumber, fo
 import { HoldingsList, OrderList, ScheduledTaskList } from '@/components/finance/Lists'
 import { DirectionBadge, MarketBadge, PriceChange, SideBadge, Stat } from '@/components/finance/parts'
 import { SectionTitle, SummaryBlock } from '@/components/finance/Summary'
+import { AgentTaskList } from '@/features/agent/AgentTasks'
 import { useChatUi } from '../ChatContext'
 import { CandleChart } from './CandleChart'
 import type {
   AccountSummary,
+  AgentTask,
   Candle,
   CandlesCardData,
   Card,
+  LlmPicksData,
   OrderHistoryItem,
   OrderResultData,
   Prediction,
@@ -207,7 +212,16 @@ function PredictionCard({ data }: { data: Prediction }) {
 function RecommendationsCard({ data }: { data: Recommendation[] }) {
   const { sendMessage, busy } = useChatUi()
   return (
-    <CardShell icon={<Trophy className="h-4 w-4" />} title={`추천 종목 TOP ${data.length}`} flush>
+    <CardShell
+      icon={<Trophy className="h-4 w-4" />}
+      title={
+        <>
+          모델 추천 TOP {data.length}
+          {data[0]?.asOf && <span className="text-xs font-normal text-subtle">{data[0].asOf} 마감 기준</span>}
+        </>
+      }
+      flush
+    >
       <ol className="divide-y divide-border">
         {data.map((r, i) => {
           const cur = currencyOf(r)
@@ -417,6 +431,71 @@ function ScheduledTasksCard({ data }: { data: ScheduledTask[] }) {
   )
 }
 
+function LlmPicksCard({ data }: { data: LlmPicksData }) {
+  const { sendMessage, busy } = useChatUi()
+  const picks = data?.picks ?? []
+  return (
+    <CardShell
+      icon={<BrainCircuit className="h-4 w-4" />}
+      title={
+        <>
+          AI 의견 {picks.length}종목
+          <Badge tone="brand">LLM 판단</Badge>
+        </>
+      }
+      flush
+    >
+      <ul className="divide-y divide-border">
+        {picks.map((p) => {
+          const cur = currencyOf(p)
+          return (
+            <li key={`${p.market ?? 'KRX'}-${p.productNumber}`} className="px-4 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => sendMessage(`${p.name} 시세 알려줘`)}
+                  className="flex min-w-0 items-center gap-1.5 truncate text-left font-semibold hover:text-brand-text disabled:pointer-events-none"
+                >
+                  <span className="truncate">{p.name}</span>
+                  <MarketBadge market={p.market} />
+                  <span className="tabular text-xs font-normal text-subtle">{p.productNumber}</span>
+                </button>
+                <span className="tabular text-sm">{formatMoney(p.currentPrice, cur)}</span>
+              </div>
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                {p.outlook && <Badge tone="brand">{p.outlook}</Badge>}
+                {p.inModelTop ? (
+                  <Badge tone="success">모델 추천과 일치{p.modelRank ? ` · ${p.modelRank}위` : ''}</Badge>
+                ) : p.modelAnalyzed ? (
+                  <Badge tone="neutral">
+                    모델 {p.modelRank ? `${p.modelTotal ? `${p.modelTotal}종목 중 ` : ''}${p.modelRank}위` : '분석됨'} (추천 밖)
+                  </Badge>
+                ) : (
+                  <Badge tone="warning">모델 분석 없음</Badge>
+                )}
+                {p.modelDirection && <DirectionBadge direction={p.modelDirection} />}
+              </div>
+              {p.reason && <p className="mt-2 text-sm text-muted">{p.reason}</p>}
+            </li>
+          )
+        })}
+      </ul>
+      <p className="border-t border-border px-4 py-2 text-xs text-subtle">
+        AI가 지표와 일반 지식으로 고른 의견입니다. 모델 분석이 없는 종목은 모델의 뒷받침이 없습니다. 실시간 뉴스·공시는 반영되지 않았고, 투자 권유가 아닙니다.
+      </p>
+    </CardShell>
+  )
+}
+
+function AgentTasksCard({ data }: { data: AgentTask[] }) {
+  return (
+    <CardShell icon={<Bot className="h-4 w-4" />} title={`자동 실행 ${data.length}건`} flush>
+      <AgentTaskList tasks={data} showAccount />
+    </CardShell>
+  )
+}
+
 class CardBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   state = { failed: false }
   static getDerivedStateFromError() {
@@ -451,6 +530,10 @@ function renderCard(card: Card) {
       return <OrdersCard data={(d ?? []) as OrderHistoryItem[]} />
     case 'order_result':
       return <OrderResultCard data={d as OrderResultData} />
+    case 'llm_recommendations':
+      return <LlmPicksCard data={d as LlmPicksData} />
+    case 'agent_tasks':
+      return <AgentTasksCard data={(d ?? []) as AgentTask[]} />
     case 'scheduled_tasks':
       return <ScheduledTasksCard data={(d ?? []) as ScheduledTask[]} />
     default:
