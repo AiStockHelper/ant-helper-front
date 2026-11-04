@@ -1,0 +1,77 @@
+name: Deploy frontend (release → S3)
+
+on:
+  push:
+    branches: ["release"]
+  pull_request:
+    branches: ["release"]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build in Docker
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Dockerfile 안에서 npm ci → vitest → tsc + vite build 를 수행하고 dist 만 꺼낸다.
+      - name: Build dist
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: dist
+          outputs: type=local,dest=dist
+          build-args: |
+            VITE_API_BASE_URL=${{ secrets.VITE_API_BASE_URL }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Check build output
+        run: test -f dist/index.html && ls -lh dist
+
+      - uses: actions/upload-artifact@v4
+        if: github.event_name != 'pull_request'
+        with:
+          name: frontend-dist
+          path: dist
+          retention-days: 7
+          if-no-files-found: error
+
+  deploy:
+    name: Deploy to S3
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    env:
+      S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: dist
+
+      - name: Check required secrets
+        run: |
+          [ -n "$S3_BUCKET_NAME" ] || { echo "::error::GitHub secret 'S3_BUCKET_NAME' is not set"; exit 1; }
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      # 새 해시 파일을 먼저 올리고 → index.html 교체 → 안 쓰는 옛 파일 삭제 순서로, 중간에 깨진 화면이 뜨지 않게 한다.
+      - name: Sync to S3
+        run: |
+          aws s3 sync dist "s3://$S3_BUCKET_NAME" --exclude index.html
+          aws s3 cp dist/index.html "s3://$S3_BUCKET_NAME/index.html" --cache-control no-store
+          aws s3 sync dist "s3://$S3_BUCKET_NAME" --delete --exclude index.html

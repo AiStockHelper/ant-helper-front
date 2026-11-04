@@ -44,7 +44,7 @@ export function ActionCard({ action, onChange }: { action: Action; onChange: (a:
     setAgreed(false)
     queryClient.invalidateQueries({ queryKey: ['summary'] })
     queryClient.invalidateQueries({ queryKey: ['orders'] })
-    queryClient.invalidateQueries({ queryKey: ['scheduled'] })
+    queryClient.invalidateQueries({ queryKey: ['agent'] })
   }
 
   const approve = useMutation({
@@ -89,13 +89,13 @@ export function ActionCard({ action, onChange }: { action: Action; onChange: (a:
       {real && (
         <div className="flex items-center gap-2 bg-real-solid px-4 py-1.5 text-xs font-bold text-white">
           <ShieldAlert className="h-4 w-4" aria-hidden />
-          실전 계좌 · 실제 자금으로 거래됩니다
+          {action.kind === 'AGENT_TASK' ? '실전 계좌 · 승인하면 사람 확인 없이 실제 자금으로 자동 거래됩니다' : '실전 계좌 · 실제 자금으로 거래됩니다'}
         </div>
       )}
       <div className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-xs font-medium text-subtle">주문 확인</p>
+            <p className="text-xs font-medium text-subtle">{action.kind === 'AGENT_TASK' ? '자동 실행 확인' : '주문 확인'}</p>
             <h3 className="mt-0.5 text-base font-bold leading-snug">{action.title}</h3>
           </div>
           <Badge tone={info.tone}>{info.label}</Badge>
@@ -130,7 +130,7 @@ export function ActionCard({ action, onChange }: { action: Action; onChange: (a:
               <div className="mt-3 rounded-xl border border-real/50 bg-real-soft p-3.5">
                 <p className="flex items-start gap-2 text-sm font-semibold text-real">
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-                  한 번 더 확인해 주세요. 승인 즉시 실전 계좌에 반영되며 되돌릴 수 없습니다.
+                  {action.kind === 'AGENT_TASK' ? '한 번 더 확인해 주세요. 승인하면 정해진 일정마다 실전 계좌에서 자동으로 주문이 나갑니다.' : '한 번 더 확인해 주세요. 승인 즉시 실전 계좌에 반영되며 되돌릴 수 없습니다.'}
                 </p>
                 <label className="mt-3 flex min-h-[44px] cursor-pointer items-center gap-2.5 text-sm">
                   <input
@@ -139,7 +139,7 @@ export function ActionCard({ action, onChange }: { action: Action; onChange: (a:
                     onChange={(e) => setAgreed(e.target.checked)}
                     className="h-5 w-5 shrink-0 accent-[rgb(var(--real-solid))]"
                   />
-                  <span>위 주문 내용을 확인했으며 실전 주문 실행에 동의합니다.</span>
+                  <span>{action.kind === 'AGENT_TASK' ? '위 내용과 한도를 확인했으며 실전 계좌의 자동 주문에 동의합니다.' : '위 주문 내용을 확인했으며 실전 주문 실행에 동의합니다.'}</span>
                 </label>
               </div>
             )}
@@ -161,7 +161,7 @@ export function ActionCard({ action, onChange }: { action: Action; onChange: (a:
                 loading={approve.isPending}
                 disabled={busy || (real && confirming && !agreed)}
               >
-                {real && confirming ? '실전 주문 실행' : real ? '승인…' : '승인'}
+                {real && confirming ? (action.kind === 'AGENT_TASK' ? '자동 실행 시작' : '실전 주문 실행') : real ? '승인…' : '승인'}
               </Button>
             </div>
           </>
@@ -188,7 +188,7 @@ export function ActionCard({ action, onChange }: { action: Action; onChange: (a:
             </div>
           </div>
         )}
-        {status === 'REJECTED' && <p className="mt-3 text-sm text-muted">거절했습니다. 주문은 실행되지 않았어요.</p>}
+        {status === 'REJECTED' && <p className="mt-3 text-sm text-muted">거절했습니다. 아무것도 실행되지 않았어요.</p>}
         {status === 'EXPIRED' && <p className="mt-3 text-sm text-muted">유효 시간이 지나 만료되었습니다. 다시 요청해 주세요.</p>}
       </div>
     </section>

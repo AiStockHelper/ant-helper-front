@@ -6,6 +6,8 @@ import { ChatPage } from '@/features/chat/ChatPage'
 import { PortfolioPage } from '@/features/portfolio/PortfolioPage'
 import { AccountsPage } from '@/features/accounts/AccountsPage'
 import { SettingsPage } from '@/features/settings/SettingsPage'
+import { SkillsPage } from '@/features/skills/SkillsPage'
+import { SkillDetailPage } from '@/features/skills/SkillDetailPage'
 
 export function AppRoutes() {
   return (
@@ -16,6 +18,8 @@ export function AppRoutes() {
         <Route element={<AppShell />}>
           <Route index element={<Navigate to="/chat" replace />} />
           <Route path="chat/:conversationId?" element={<ChatPage />} />
+          <Route path="skills" element={<SkillsPage />} />
+          <Route path="skills/:skillId" element={<SkillDetailPage />} />
           <Route path="portfolio" element={<PortfolioPage />} />
           <Route path="accounts" element={<AccountsPage />} />
           <Route path="settings" element={<SettingsPage />} />
