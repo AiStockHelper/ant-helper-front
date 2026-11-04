@@ -1,32 +1,31 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { useInfiniteQuery, useIsFetching, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useIsFetching, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertCircle, Landmark, RefreshCw, ShieldAlert } from 'lucide-react'
-import { accountsApi, scheduledApi } from '@/api/endpoints'
+import { accountsApi, agentApi } from '@/api/endpoints'
 import { errorMessage } from '@/api/client'
 import { AccountSelect } from '@/components/AccountSelect'
 import { PageBody, PageHeader } from '@/components/PageHeader'
 import { AllocationDonut } from '@/components/finance/AllocationDonut'
-import { HoldingsList, OrderList, ScheduledTaskList } from '@/components/finance/Lists'
-import { EmptyState, ORDER_STATUS_LABEL, PnL, TASK_STATUS_LABEL } from '@/components/finance/parts'
+import { HoldingsList, OrderList } from '@/components/finance/Lists'
+import { EmptyState, ORDER_STATUS_LABEL, PnL } from '@/components/finance/parts'
 import { AccountTypeBadge, Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
-import { ConfirmDialog } from '@/components/ui/Dialog'
 import { Skeleton } from '@/components/ui/Skeleton'
-import { useToast } from '@/components/ui/Toast'
 import { useAccounts } from '@/features/accounts/useAccounts'
 import { cn } from '@/lib/cn'
 import { SectionTitle, SummaryBlock } from '@/components/finance/Summary'
 import { Segmented } from '@/components/ui/Field'
-import { formatAmount, formatDate, formatTime, parseDate, toDateInputValue } from '@/lib/format'
-import type { OrderScope, OrderStatus, ScheduledTask, ScheduledTaskStatus } from '@/api/types'
+import { formatAmount, formatDate, formatTime, toDateInputValue } from '@/lib/format'
+import { AgentTaskManager, NoAgentTasks } from '@/features/agent/AgentTasks'
+import type { OrderScope, OrderStatus } from '@/api/types'
 
-type TabKey = 'overview' | 'holdings' | 'orders' | 'scheduled' | 'info'
+type TabKey = 'overview' | 'holdings' | 'orders' | 'automation' | 'info'
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'overview', label: '개요' },
   { key: 'holdings', label: '보유 종목' },
   { key: 'orders', label: '거래내역' },
-  { key: 'scheduled', label: '예약' },
+  { key: 'automation', label: '자동화' },
   { key: 'info', label: '계좌정보' },
 ]
 const LAST_ACCOUNT_KEY = 'ant.portfolio.account'
@@ -288,44 +287,41 @@ function Orders({ accountId }: { accountId: number }) {
   )
 }
 
-const TASK_FILTERS: (ScheduledTaskStatus | 'ALL')[] = ['ALL', 'SCHEDULED', 'DONE', 'FAILED', 'CANCELED']
+const AGENT_FILTERS: { key: 'LIVE' | 'ENDED' | 'ALL'; label: string }[] = [
+  { key: 'LIVE', label: '진행 중' },
+  { key: 'ENDED', label: '종료' },
+  { key: 'ALL', label: '전체' },
+]
 
-function Scheduled({ accountId }: { accountId: number }) {
-  const qc = useQueryClient()
-  const toast = useToast()
-  const [filter, setFilter] = useState<ScheduledTaskStatus | 'ALL'>('ALL')
-  const [target, setTarget] = useState<ScheduledTask | null>(null)
-  const q = useQuery({ queryKey: ['scheduled', accountId], queryFn: () => scheduledApi.list({ accountId }) })
-  const cancel = useMutation({
-    mutationFn: (t: ScheduledTask) => scheduledApi.cancel(t.id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['scheduled'] })
-      toast.success('예약을 취소했어요.')
-      setTarget(null)
-    },
-    onError: (e) => toast.error(errorMessage(e)),
+function Automation({ accountId }: { accountId: number }) {
+  const [filter, setFilter] = useState<'LIVE' | 'ENDED' | 'ALL'>('LIVE')
+  const q = useQuery({ queryKey: ['agent', 'account', accountId], queryFn: () => agentApi.list({ accountId }), refetchInterval: 20_000 })
+  const all = q.data ?? []
+  const tasks = all.filter((t) => {
+    const ended = t.status === 'DONE' || t.status === 'CANCELED'
+    return filter === 'ALL' || (filter === 'LIVE' ? !ended : ended)
   })
-  const tasks = (q.data ?? [])
-    .filter((t) => filter === 'ALL' || t.status === filter)
-    .sort((a, b) => (parseDate(b.runAt)?.getTime() ?? 0) - (parseDate(a.runAt)?.getTime() ?? 0))
 
   return (
     <Card>
-      <div className="scrollbar-none flex gap-1.5 overflow-x-auto border-b border-border p-4" role="group" aria-label="상태 필터">
-        {TASK_FILTERS.map((s) => (
+      <div className="scrollbar-none flex items-center gap-1.5 overflow-x-auto border-b border-border p-4" role="group" aria-label="상태 필터">
+        {AGENT_FILTERS.map((f) => (
           <button
-            key={s}
+            key={f.key}
             type="button"
-            aria-pressed={filter === s}
-            onClick={() => setFilter(s)}
+            aria-pressed={filter === f.key}
+            onClick={() => setFilter(f.key)}
             className={cn(
               'h-11 shrink-0 rounded-full px-3.5 text-sm font-medium md:h-8',
-              filter === s ? 'bg-fg text-bg' : 'bg-surface-2 text-muted hover:bg-surface-3',
+              filter === f.key ? 'bg-fg text-bg' : 'bg-surface-2 text-muted hover:bg-surface-3',
             )}
           >
-            {s === 'ALL' ? '전체' : TASK_STATUS_LABEL[s]}
+            {f.label}
           </button>
         ))}
+        <Link to="/skills" className="ml-auto shrink-0 text-sm font-medium text-brand-text hover:underline">
+          스킬 보기
+        </Link>
       </div>
       {q.isLoading ? (
         <div className="space-y-3 p-4">
@@ -334,24 +330,14 @@ function Scheduled({ accountId }: { accountId: number }) {
         </div>
       ) : q.isError ? (
         <QueryError error={q.error} onRetry={() => q.refetch()} />
+      ) : tasks.length === 0 ? (
+        <NoAgentTasks />
       ) : (
-        <ScheduledTaskList tasks={tasks} onCancel={setTarget} />
+        <AgentTaskManager tasks={tasks} />
       )}
-      <ConfirmDialog
-        open={!!target}
-        title="예약을 취소할까요?"
-        description={target?.title}
-        confirmLabel="예약 취소"
-        cancelLabel="닫기"
-        destructive
-        loading={cancel.isPending}
-        onConfirm={() => target && cancel.mutate(target)}
-        onClose={() => setTarget(null)}
-      />
     </Card>
   )
 }
-
 function Info({ accountId }: { accountId: number }) {
   const q = useQuery({ queryKey: ['account', accountId], queryFn: () => accountsApi.detail(accountId) })
   if (q.isLoading) return <Skeleton className="h-64 rounded-2xl" />
@@ -414,11 +400,12 @@ export function PortfolioPage() {
     queryFn: () => accountsApi.summary(account!.id),
     enabled: !!account,
   }).dataUpdatedAt
-  const fetching = useIsFetching({ predicate: (qy) => ['summary', 'orders', 'scheduled', 'account'].includes(qy.queryKey[0] as string) && qy.queryKey[1] === account?.id })
+  const fetching = useIsFetching({ predicate: (qy) => ['summary', 'orders', 'account'].includes(qy.queryKey[0] as string) && qy.queryKey[1] === account?.id })
 
   const refresh = () => {
     if (!account) return
-    ;['summary', 'orders', 'scheduled', 'account'].forEach((k) => qc.invalidateQueries({ queryKey: [k, account.id] }))
+    ;['summary', 'orders', 'account'].forEach((k) => qc.invalidateQueries({ queryKey: [k, account.id] }))
+    qc.invalidateQueries({ queryKey: ['agent'] })
   }
 
   const real = account?.accountType === 'REAL_TRADE'
@@ -488,7 +475,7 @@ export function PortfolioPage() {
               {tab === 'overview' && <Overview accountId={account.id} />}
               {tab === 'holdings' && <Holdings accountId={account.id} />}
               {tab === 'orders' && <Orders accountId={account.id} />}
-              {tab === 'scheduled' && <Scheduled accountId={account.id} />}
+              {tab === 'automation' && <Automation accountId={account.id} />}
               {tab === 'info' && <Info accountId={account.id} />}
             </div>
           </>

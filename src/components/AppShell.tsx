@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useOutletContext } from 'react-router-dom'
-import { Landmark, MessageSquare, PieChart, Settings, X, type LucideIcon } from 'lucide-react'
+import { Landmark, MessageSquare, PieChart, Settings, Sparkles, X, type LucideIcon } from 'lucide-react'
 import { Logo } from '@/components/Logo'
 import { Button } from '@/components/ui/Button'
 import { ConversationList } from '@/features/chat/ConversationList'
@@ -9,6 +9,7 @@ import { cn } from '@/lib/cn'
 
 const NAV: { to: string; label: string; short: string; icon: LucideIcon }[] = [
   { to: '/chat', label: '채팅', short: '채팅', icon: MessageSquare },
+  { to: '/skills', label: '스킬', short: '스킬', icon: Sparkles },
   { to: '/portfolio', label: '내 계좌', short: '내 계좌', icon: PieChart },
   { to: '/accounts', label: '계좌 관리', short: '계좌', icon: Landmark },
   { to: '/settings', label: '설정', short: '설정', icon: Settings },
@@ -69,7 +70,7 @@ function TabBar() {
       aria-label="하단 메뉴"
       className="mobile-tabbar z-30 shrink-0 border-t border-border bg-surface/95 pb-safe backdrop-blur md:hidden"
     >
-      <ul className="grid grid-cols-4">
+      <ul className="grid grid-cols-5">
         {NAV.map(({ to, short, icon: Icon }) => (
           <li key={to}>
             <NavLink

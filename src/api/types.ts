@@ -188,6 +188,8 @@ export interface Recommendation {
   direction: Direction
   confidence: number
   reasons: string[]
+  /** 야간 분석 기준 거래일(yyyy-MM-dd). 실시간 분석이면 없음 */
+  asOf?: string | null
 }
 
 // ── 채팅 ──────────────────────────────────────────
@@ -223,6 +225,8 @@ export type CardType =
   | 'orders'
   | 'order_result'
   | 'scheduled_tasks'
+  | 'agent_tasks'
+  | 'llm_recommendations'
 
 export interface Card {
   type: CardType
@@ -230,7 +234,7 @@ export interface Card {
   data: any
 }
 
-export type ActionKind = 'ORDER' | 'SCHEDULED_ORDER' | 'SCHEDULED_RECOMMEND_BUY'
+export type ActionKind = 'ORDER' | 'AGENT_TASK' | 'SCHEDULED_ORDER' | 'SCHEDULED_RECOMMEND_BUY'
 export type ActionStatus = 'PENDING' | 'APPROVED' | 'EXECUTED' | 'REJECTED' | 'FAILED' | 'EXPIRED'
 
 export interface Action {
@@ -276,6 +280,30 @@ export interface OrderResultData {
   price?: number | null
 }
 
+export interface LlmPick {
+  productNumber: string
+  name: string
+  market?: Market
+  currency?: Currency
+  currentPrice: number
+  /** 모델이 분석한 전체 종목 중 순위(1부터). 순위가 없으면 null */
+  modelRank?: number | null
+  modelTotal?: number | null
+  /** 모델 추천(상위)에 포함된 종목인가 */
+  inModelTop: boolean
+  /** 모델 분석 결과가 있는가 */
+  modelAnalyzed: boolean
+  modelScore?: number | null
+  modelDirection?: Direction | null
+  modelPredictedChangeRate?: number | null
+  reason: string
+  outlook: string
+}
+
+export interface LlmPicksData {
+  picks: LlmPick[]
+}
+
 export interface CandlesCardData {
   productNumber?: string
   name?: string
@@ -285,6 +313,146 @@ export interface CandlesCardData {
   candles: Candle[]
 }
 
+// ── 자동 실행 / 스킬 ───────────────────────────────
+export type AgentStatus = 'ACTIVE' | 'RUNNING' | 'PAUSED' | 'DONE' | 'CANCELED'
+
+export interface Schedule {
+  type: 'ONCE' | 'DAILY' | 'MARKET_EVENT' | 'MARKET_INTERVAL'
+  runAt?: string
+  time?: string
+  days?: string[]
+  zone?: string
+  market?: string
+  event?: string
+  offsetMinutes?: number
+  intervalMinutes?: number
+  startOffsetMinutes?: number
+  endOffsetMinutes?: number
+}
+
+export interface Ledger {
+  currency: Currency
+  budget: number
+  available: number
+  invested: number
+  realizedPnl: number
+  unrealizedPnl: number
+  totalPnl: number
+  totalPnlPct: number
+  openPositions: number
+  boughtToday: number
+  maxPositionPct?: number
+  maxLossPct?: number
+  maxDailyBuy?: number
+}
+
+export interface AgentTask {
+  id: number
+  accountId: number
+  accountType: AccountType | null
+  accountLabel: string
+  skillId?: string | null
+  skillName?: string | null
+  title: string
+  instruction?: string | null
+  status: AgentStatus
+  pausedReason?: string | null
+  autonomous: boolean
+  schedule: Schedule
+  scheduleLabel: string
+  nextRunAt?: string | null
+  lastRunAt?: string | null
+  lastResult?: string | null
+  runCount: number
+  failCount: number
+  conversationId?: number | null
+  createdBy: 'USER' | 'AGENT'
+  parentTaskId?: number | null
+  config: Record<string, unknown>
+  ledger?: Ledger | null
+  createdAt: string
+}
+
+export interface AgentPosition {
+  id: number
+  market: Market
+  currency: Currency
+  symbol: string
+  name: string
+  quantity: number
+  avgPrice: number
+  lastPrice?: number | null
+  pnlPct: number
+  unrealizedPnl: number
+  realizedPnl: number
+  status: 'OPEN' | 'CLOSED' | 'RELEASED'
+  openedAt: string
+  closedAt?: string | null
+  exitReason?: string | null
+}
+
+export interface AgentTrade {
+  id: number
+  side: 'BUY' | 'SELL'
+  market: Market
+  currency: Currency
+  symbol: string
+  name: string
+  quantity: number
+  price: number
+  amount: number
+  reason?: string | null
+  createdAt: string
+}
+
+export interface AgentRun {
+  id: number
+  status: 'DONE' | 'FAILED' | 'SKIPPED'
+  manual: boolean
+  startedAt: string
+  finishedAt: string
+  summary?: string | null
+  events: string[]
+}
+
+export interface AgentTaskDetail {
+  task: AgentTask
+  positions: AgentPosition[]
+  trades: AgentTrade[]
+  runs: AgentRun[]
+  memory?: string | null
+}
+
+export interface SkillParam {
+  key: string
+  label: string
+  type: 'NUMBER' | 'TEXT' | 'SELECT' | 'BOOLEAN'
+  defaultValue?: string | number | boolean | null
+  min?: number | null
+  max?: number | null
+  options?: { value: string; label: string }[] | null
+  help?: string | null
+  required: boolean
+  unit?: string | null
+}
+
+export interface Skill {
+  id: string
+  name: string
+  summary: string
+  detail: string
+  category: string
+  trades: boolean
+  params: SkillParam[]
+}
+
+export interface CreateAgentTaskRequest {
+  accountId: number
+  skillId: string
+  config: Record<string, unknown>
+  confirmRealTrading?: boolean
+}
+/** 이전 예약 방식으로 남은 채팅 카드를 그리기 위한 타입 */
 export type ScheduledTaskStatus = 'SCHEDULED' | 'RUNNING' | 'DONE' | 'FAILED' | 'CANCELED'
 
 export interface ScheduledTask {

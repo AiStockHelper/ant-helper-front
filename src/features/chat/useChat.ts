@@ -274,7 +274,7 @@ export function useChat({ conversationId, getAccountId, navigateToConversation }
           qc.invalidateQueries({ queryKey: ['conversations'] })
           qc.invalidateQueries({ queryKey: ['summary'] })
           qc.invalidateQueries({ queryKey: ['orders'] })
-          qc.invalidateQueries({ queryKey: ['scheduled'] })
+          qc.invalidateQueries({ queryKey: ['agent'] })
         }
       }
     },
