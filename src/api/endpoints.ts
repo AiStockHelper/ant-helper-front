@@ -10,8 +10,10 @@ import type {
   Conversation,
   ConversationDetail,
   CreateAccountRequest,
+  LoginChallenge,
   Me,
   OrderHistoryItem,
+  StepUpChallenge,
   OrderScope,
   PageResponse,
   AgentTask,
@@ -23,7 +25,11 @@ import type {
 export const authApi = {
   signup: (body: { email: string; password: string; nickname: string }) =>
     api.post<{ id: number; email: string; nickname: string }>('/auth/signup', body, { auth: false }),
-  login: (body: { email: string; password: string }) => api.post<AuthTokens>('/auth/login', body, { auth: false }),
+  login: (body: { email: string; password: string }) => api.post<LoginChallenge>('/auth/login', body, { auth: false }),
+  verifyLogin: (body: { challengeId: string; code: string }) =>
+    api.post<AuthTokens>('/auth/login/verify', body, { auth: false }),
+  stepUpRequest: () => api.post<StepUpChallenge>('/auth/step-up/request'),
+  stepUpVerify: (body: { challengeId: string; code: string }) => api.post<void>('/auth/step-up/verify', body),
   logout: () => api.post<void>('/auth/logout'),
   me: () => api.get<Me>('/auth/me'),
   updateMe: (body: { nickname: string }) => api.patch<Me>('/auth/me', body),

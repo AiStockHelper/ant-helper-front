@@ -33,6 +33,21 @@ export interface Me {
   createdAt: string
 }
 
+/** 로그인 1단계 결과: 이메일로 인증번호를 보냈다. */
+export interface LoginChallenge {
+  challengeId: string
+  maskedEmail: string
+  expiresInSeconds: number
+  resendAfterSeconds: number
+}
+
+export interface StepUpChallenge {
+  challengeId: string
+  expiresInSeconds: number
+  resendAfterSeconds: number
+  validMinutes: number
+}
+
 export interface AuthTokens {
   accessToken: string
   refreshToken: string

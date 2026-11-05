@@ -3,6 +3,7 @@ import { BrowserRouter } from 'react-router-dom'
 import { ApiError } from '@/api/client'
 import { ToastProvider } from '@/components/ui/Toast'
 import { AuthProvider } from '@/features/auth/AuthContext'
+import { StepUpDialog } from '@/features/auth/StepUpDialog'
 import { ThemeProvider } from '@/features/settings/ThemeContext'
 import { AppRoutes } from './routes'
 
@@ -24,6 +25,7 @@ export default function App() {
           <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <AuthProvider>
               <AppRoutes />
+              <StepUpDialog />
             </AuthProvider>
           </BrowserRouter>
         </ToastProvider>

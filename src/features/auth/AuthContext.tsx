@@ -8,7 +8,7 @@ import {
   setTokenRefreshedHandler,
   setTokens,
 } from '@/api/client'
-import type { Me } from '@/api/types'
+import type { LoginChallenge, Me } from '@/api/types'
 
 type Status = 'loading' | 'authenticated' | 'anonymous'
 
@@ -17,7 +17,10 @@ interface AuthContextValue {
   user: Me | null
   /** 사용자가 직접 로그아웃/탈퇴한 경우 true. 이때는 돌아갈 경로를 기억하지 않는다. */
   signedOutByUser: boolean
-  login: (email: string, password: string) => Promise<void>
+  /** 1단계: 비밀번호 확인 후 이메일로 인증번호를 보낸다. */
+  login: (email: string, password: string) => Promise<LoginChallenge>
+  /** 2단계: 이메일로 받은 6자리 인증번호로 로그인을 마친다. */
+  verifyLogin: (challengeId: string, code: string) => Promise<void>
   signup: (email: string, password: string, nickname: string) => Promise<void>
   logout: () => Promise<void>
   updateNickname: (nickname: string) => Promise<void>
@@ -69,9 +72,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const login = useCallback(
-    async (email: string, password: string) => {
-      const tokens = await authApi.login({ email, password })
+  const login = useCallback((email: string, password: string) => authApi.login({ email, password }), [])
+
+  const verifyLogin = useCallback(
+    async (challengeId: string, code: string) => {
+      const tokens = await authApi.verifyLogin({ challengeId, code })
       queryClient.clear()
       setTokens(tokens)
       setSignedOutByUser(false)
@@ -81,14 +86,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [queryClient],
   )
 
-  const signup = useCallback(
-    async (email: string, password: string, nickname: string) => {
-      await authApi.signup({ email, password, nickname })
-      await login(email, password)
-    },
-    [login],
-  )
-
+  /** 가입만 한다. 로그인은 이메일 인증번호 단계를 거쳐야 하므로 호출한 쪽이 로그인 화면으로 보낸다. */
+  const signup = useCallback(async (email: string, password: string, nickname: string) => {
+    await authApi.signup({ email, password, nickname })
+  }, [])
   const logout = useCallback(async () => {
     try {
       await authApi.logout()
@@ -111,8 +112,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [reset])
 
   const value = useMemo(
-    () => ({ status, user, signedOutByUser, login, signup, logout, updateNickname, deleteAccount }),
-    [status, user, signedOutByUser, login, signup, logout, updateNickname, deleteAccount],
+    () => ({ status, user, signedOutByUser, login, verifyLogin, signup, logout, updateNickname, deleteAccount }),
+    [status, user, signedOutByUser, login, verifyLogin, signup, logout, updateNickname, deleteAccount],
   )
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

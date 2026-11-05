@@ -158,8 +158,23 @@ function defaultMessage(status: number): string {
   return '요청을 처리하지 못했습니다.'
 }
 
+/** 서버가 '실계좌 보호용 이메일 인증'을 요구하면(S-010) 인증번호 창을 띄우고, 통과하면 같은 요청을 한 번 더 보낸다. */
+export const STEP_UP_REQUIRED = 'S-010'
+let stepUpHandler: (() => Promise<boolean>) | null = null
+
+export function setStepUpHandler(fn: (() => Promise<boolean>) | null) {
+  stepUpHandler = fn
+}
+
 async function request<T>(method: string, path: string, body?: unknown, opts: Omit<RawOptions, 'method' | 'body'> = {}) {
-  const res = await rawFetch(path, { ...opts, method, body })
+  let res = await rawFetch(path, { ...opts, method, body })
+  if (res.status === 403 && stepUpHandler) {
+    const err = await toApiError(res.clone())
+    if (err.code === STEP_UP_REQUIRED) {
+      if (!(await stepUpHandler())) throw err
+      res = await rawFetch(path, { ...opts, method, body })
+    }
+  }
   if (!res.ok) throw await toApiError(res)
   const text = await res.text()
   if (!text) return undefined as T
