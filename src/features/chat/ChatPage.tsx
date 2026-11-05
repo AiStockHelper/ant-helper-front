@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowDown, MessageSquarePlus, Menu, RefreshCw, WifiOff, Landmark, AlertCircle } from 'lucide-react'
@@ -13,6 +13,7 @@ import { useToast } from '@/components/ui/Toast'
 import { useAuth } from '@/features/auth/AuthContext'
 import { useAccounts } from '@/features/accounts/useAccounts'
 import { cn } from '@/lib/cn'
+import { formatDayDivider, sameDay } from '@/lib/format'
 import { ChatUiContext } from './ChatContext'
 import { Composer } from './Composer'
 import { MessageItem } from './MessageItem'
@@ -21,6 +22,16 @@ import { useChat } from './useChat'
 const FALLBACK_SUGGESTIONS = ['삼성전자 주가 알려줘', '내 계좌 잔고 보여줘', '내일 오를 만한 종목 추천해줘', '삼성전자 10주 사줘']
 const DRAFT_ACCOUNT_KEY = 'ant.chat.account'
 
+/** 날짜가 바뀌는 곳에 들어가는 구분선 ("2026년 11월 5일 목요일") */
+function DayDivider({ iso }: { iso: string }) {
+  const text = formatDayDivider(iso)
+  if (!text) return null
+  return (
+    <div className="flex justify-center" role="separator" aria-label={text}>
+      <span className="rounded-full bg-surface-2 px-3 py-1 text-xs font-medium text-muted">{text}</span>
+    </div>
+  )
+}
 function useOnline() {
   const [online, setOnline] = useState(() => navigator.onLine)
   useEffect(() => {
@@ -274,16 +285,18 @@ export function ChatPage() {
             ) : (
               <div className="space-y-7" role="log" aria-live="off" aria-label="대화 내용">
                 {messages.map((m, i) => (
-                  <MessageItem
-                    key={m._key ?? m.id}
-                    message={m}
-                    isLast={i === lastIdx}
-                    live={streaming && i === lastIdx && m.role === 'ASSISTANT'}
-                    busy={streaming}
-                    onRegenerate={chat.regenerate}
-                    onEdit={handleEdit}
-                    onActionChange={chat.updateAction}
-                  />
+                  <Fragment key={m._key ?? m.id}>
+                    {(i === 0 || !sameDay(messages[i - 1].createdAt, m.createdAt)) && <DayDivider iso={m.createdAt} />}
+                    <MessageItem
+                      message={m}
+                      isLast={i === lastIdx}
+                      live={streaming && i === lastIdx && m.role === 'ASSISTANT'}
+                      busy={streaming}
+                      onRegenerate={chat.regenerate}
+                      onEdit={handleEdit}
+                      onActionChange={chat.updateAction}
+                    />
+                  </Fragment>
                 ))}
                 {streamError && (
                   <div
