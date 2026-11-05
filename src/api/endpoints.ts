@@ -13,6 +13,7 @@ import type {
   LoginChallenge,
   Me,
   OrderHistoryItem,
+  OrderRequestItem,
   StepUpChallenge,
   OrderScope,
   PageResponse,
@@ -71,6 +72,18 @@ export const agentApi = {
   cancel: (id: number) => api.delete<AgentTask>(`/agent/tasks/${id}`),
   pauseAll: () => api.post<{ paused: number }>('/agent/pause-all'),
 }
+export const orderQueueApi = {
+  list: (p: { accountId?: number; status?: 'PENDING' | 'FAILED' | 'SUCCESS' } = {}) => {
+    const q = new URLSearchParams()
+    if (p.accountId != null) q.set('accountId', String(p.accountId))
+    if (p.status) q.set('status', p.status)
+    const qs = q.toString()
+    return api.get<OrderRequestItem[]>('/order-requests' + (qs ? '?' + qs : ''))
+  },
+  remove: (id: number) => api.delete<void>('/order-requests/' + id),
+  removeFailed: (accountId?: number) => api.delete<{ deleted: number }>('/order-requests' + (accountId != null ? '?accountId=' + accountId : '')),
+}
+
 export const chatApi = {
   conversations: (p: { q?: string; page: number; size: number }) => {
     const q = new URLSearchParams({ page: String(p.page), size: String(p.size) })
