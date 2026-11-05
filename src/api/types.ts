@@ -482,3 +482,29 @@ export type ChatStreamEvent =
   | { event: 'title'; data: { title: string } }
   | { event: 'done'; data: { message: Message } }
   | { event: 'error'; data: { code: string; message: string } }
+
+// ── 주문 큐 ───────────────────────────────────────
+export type OrderRequestStatus = 'SENDING' | 'RETRY_WAIT' | 'SUCCESS' | 'FAILED'
+
+export interface OrderRequestItem {
+  id: number
+  accountId: number
+  accountName: string
+  source: 'CHAT_ACTION' | 'AGENT' | 'MANUAL'
+  market: Market
+  currency: Currency
+  symbol: string
+  name: string | null
+  side: OrderSide
+  quantity: number
+  limitPrice: number | null
+  status: OrderRequestStatus
+  attempts: number
+  maxRetries: number
+  nextAttemptAt: string | null
+  failureKind: string | null
+  lastError: string | null
+  orderNo: string | null
+  createdAt: string
+  completedAt: string | null
+}

@@ -18,13 +18,15 @@ import { SectionTitle, SummaryBlock } from '@/components/finance/Summary'
 import { Segmented } from '@/components/ui/Field'
 import { formatAmount, formatDate, formatTime, toDateInputValue } from '@/lib/format'
 import { AgentTaskManager, NoAgentTasks } from '@/features/agent/AgentTasks'
+import { OrderQueue } from '@/features/orderqueue/OrderQueue'
 import type { OrderScope, OrderStatus } from '@/api/types'
 
-type TabKey = 'overview' | 'holdings' | 'orders' | 'automation' | 'info'
+type TabKey = 'overview' | 'holdings' | 'orders' | 'queue' | 'automation' | 'info'
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'overview', label: '개요' },
   { key: 'holdings', label: '보유 종목' },
   { key: 'orders', label: '거래내역' },
+  { key: 'queue', label: '주문 큐' },
   { key: 'automation', label: '자동화' },
   { key: 'info', label: '계좌정보' },
 ]
@@ -406,6 +408,7 @@ export function PortfolioPage() {
     if (!account) return
     ;['summary', 'orders', 'account'].forEach((k) => qc.invalidateQueries({ queryKey: [k, account.id] }))
     qc.invalidateQueries({ queryKey: ['agent'] })
+    qc.invalidateQueries({ queryKey: ['order-requests'] })
   }
 
   const real = account?.accountType === 'REAL_TRADE'
@@ -475,6 +478,7 @@ export function PortfolioPage() {
               {tab === 'overview' && <Overview accountId={account.id} />}
               {tab === 'holdings' && <Holdings accountId={account.id} />}
               {tab === 'orders' && <Orders accountId={account.id} />}
+              {tab === 'queue' && <OrderQueue accountId={account.id} />}
               {tab === 'automation' && <Automation accountId={account.id} />}
               {tab === 'info' && <Info accountId={account.id} />}
             </div>
