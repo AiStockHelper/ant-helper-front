@@ -1,10 +1,12 @@
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, LineChart, MessageSquareText, ShieldCheck } from 'lucide-react'
 import { Logo } from '@/components/Logo'
 import { Button } from '@/components/ui/Button'
 import { Field } from '@/components/ui/Field'
 import { errorMessage } from '@/api/client'
+import type { LoginChallenge } from '@/api/types'
+import { CodeInput } from './CodeInput'
 import { useAuth } from './AuthContext'
 
 function useReturnTo(): string {
@@ -93,18 +95,35 @@ function PasswordField({ label, value, onChange, error, autoComplete, hint }: {
 }
 
 export function LoginPage() {
-  const { status, login } = useAuth()
+  const { status, login, verifyLogin } = useAuth()
   const navigate = useNavigate()
   const returnTo = useReturnTo()
   const location = useLocation()
-  const [email, setEmail] = useState('')
+  const notice = (location.state as { notice?: string; email?: string } | null)?.notice
+  const [email, setEmail] = useState((location.state as { email?: string } | null)?.email ?? '')
   const [password, setPassword] = useState('')
+  const [challenge, setChallenge] = useState<LoginChallenge | null>(null)
+  const [code, setCode] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [resendLeft, setResendLeft] = useState(0)
+
+  useEffect(() => {
+    if (resendLeft <= 0) return
+    const id = window.setTimeout(() => setResendLeft((s) => s - 1), 1000)
+    return () => window.clearTimeout(id)
+  }, [resendLeft])
 
   if (status === 'authenticated') return <Navigate to={returnTo} replace />
 
-  const onSubmit = async (e: FormEvent) => {
+  const sendCode = async () => {
+    const c = await login(email.trim(), password)
+    setChallenge(c)
+    setCode('')
+    setResendLeft(c.resendAfterSeconds)
+  }
+
+  const onSubmitPassword = async (e: FormEvent) => {
     e.preventDefault()
     if (!email.trim() || !password) {
       setError('이메일과 비밀번호를 입력해 주세요.')
@@ -113,8 +132,7 @@ export function LoginPage() {
     setLoading(true)
     setError(null)
     try {
-      await login(email.trim(), password)
-      navigate(returnTo, { replace: true })
+      await sendCode()
     } catch (err) {
       setError(errorMessage(err, '로그인에 실패했습니다.'))
     } finally {
@@ -122,20 +140,96 @@ export function LoginPage() {
     }
   }
 
+  const onSubmitCode = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!challenge) return
+    if (code.length !== 6) {
+      setError('인증번호 6자리를 입력해 주세요.')
+      return
+    }
+    setLoading(true)
+    setError(null)
+    try {
+      await verifyLogin(challenge.challengeId, code)
+      navigate(returnTo, { replace: true })
+    } catch (err) {
+      setError(errorMessage(err, '인증에 실패했습니다.'))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const resend = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      await sendCode()
+    } catch (err) {
+      setError(errorMessage(err, '인증번호를 다시 보내지 못했습니다.'))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const footer = (
+    <>
+      계정이 없으신가요?{' '}
+      <Link to="/signup" state={location.state} className="font-semibold text-brand-text hover:underline">
+        회원가입
+      </Link>
+    </>
+  )
+
+  if (challenge) {
+    return (
+      <AuthLayout
+        title="이메일 인증"
+        subtitle={`${challenge.maskedEmail} 로 보낸 인증번호 6자리를 입력해 주세요. (${Math.round(challenge.expiresInSeconds / 60)}분 안에 입력)`}
+        footer={footer}
+      >
+        <form onSubmit={onSubmitCode} className="space-y-4" noValidate>
+          <CodeInput value={code} onChange={setCode} />
+          {error && (
+            <p role="alert" className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">
+              {error}
+            </p>
+          )}
+          <Button type="submit" variant="primary" size="lg" className="w-full" loading={loading}>
+            인증하고 로그인
+          </Button>
+          <div className="flex items-center justify-between text-sm">
+            <button
+              type="button"
+              className="text-muted hover:text-fg"
+              onClick={() => {
+                setChallenge(null)
+                setError(null)
+              }}
+            >
+              처음으로
+            </button>
+            <button
+              type="button"
+              disabled={resendLeft > 0 || loading}
+              className="font-semibold text-brand-text hover:underline disabled:text-subtle disabled:no-underline"
+              onClick={resend}
+            >
+              {resendLeft > 0 ? `인증번호 다시 받기 (${resendLeft}초)` : '인증번호 다시 받기'}
+            </button>
+          </div>
+        </form>
+      </AuthLayout>
+    )
+  }
+
   return (
-    <AuthLayout
-      title="다시 만나서 반가워요"
-      subtitle="로그인하고 AI 채팅으로 주식을 관리해 보세요."
-      footer={
-        <>
-          계정이 없으신가요?{' '}
-          <Link to="/signup" state={location.state} className="font-semibold text-brand-text hover:underline">
-            회원가입
-          </Link>
-        </>
-      }
-    >
-      <form onSubmit={onSubmit} className="space-y-4" noValidate>
+    <AuthLayout title="다시 만나서 반가워요" subtitle="로그인하고 AI 채팅으로 주식을 관리해 보세요." footer={footer}>
+      <form onSubmit={onSubmitPassword} className="space-y-4" noValidate>
+        {notice && (
+          <p role="status" className="rounded-lg bg-brand-soft px-3 py-2 text-sm text-brand-text">
+            {notice}
+          </p>
+        )}
         <Field
           label="이메일"
           type="email"
@@ -152,13 +246,13 @@ export function LoginPage() {
           </p>
         )}
         <Button type="submit" variant="primary" size="lg" className="w-full" loading={loading}>
-          로그인
+          인증번호 받기
         </Button>
+        <p className="text-center text-xs text-subtle">로그인할 때마다 이메일로 인증번호가 발송됩니다.</p>
       </form>
     </AuthLayout>
   )
 }
-
 export function SignupPage() {
   const { status, signup } = useAuth()
   const navigate = useNavigate()
@@ -188,7 +282,10 @@ export function SignupPage() {
     setLoading(true)
     try {
       await signup(email.trim(), password, nickname.trim())
-      navigate(returnTo, { replace: true })
+      navigate('/login', {
+        replace: true,
+        state: { ...(location.state as object | null), email: email.trim(), notice: '가입이 완료되었습니다. 로그인해 주세요.' },
+      })
     } catch (err) {
       setFormError(errorMessage(err, '회원가입에 실패했습니다.'))
     } finally {
