@@ -33,6 +33,21 @@ export interface Me {
   createdAt: string
 }
 
+/** 로그인 1단계 결과: 이메일로 인증번호를 보냈다. */
+export interface LoginChallenge {
+  challengeId: string
+  maskedEmail: string
+  expiresInSeconds: number
+  resendAfterSeconds: number
+}
+
+export interface StepUpChallenge {
+  challengeId: string
+  expiresInSeconds: number
+  resendAfterSeconds: number
+  validMinutes: number
+}
+
 export interface AuthTokens {
   accessToken: string
   refreshToken: string
@@ -467,3 +482,29 @@ export type ChatStreamEvent =
   | { event: 'title'; data: { title: string } }
   | { event: 'done'; data: { message: Message } }
   | { event: 'error'; data: { code: string; message: string } }
+
+// ── 주문 큐 ───────────────────────────────────────
+export type OrderRequestStatus = 'SENDING' | 'RETRY_WAIT' | 'SUCCESS' | 'FAILED'
+
+export interface OrderRequestItem {
+  id: number
+  accountId: number
+  accountName: string
+  source: 'CHAT_ACTION' | 'AGENT' | 'MANUAL'
+  market: Market
+  currency: Currency
+  symbol: string
+  name: string | null
+  side: OrderSide
+  quantity: number
+  limitPrice: number | null
+  status: OrderRequestStatus
+  attempts: number
+  maxRetries: number
+  nextAttemptAt: string | null
+  failureKind: string | null
+  lastError: string | null
+  orderNo: string | null
+  createdAt: string
+  completedAt: string | null
+}

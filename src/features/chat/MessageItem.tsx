@@ -3,6 +3,7 @@ import { AlertCircle, Check, Copy, Pencil, RefreshCw, Square } from 'lucide-reac
 import { LogoMark } from '@/components/Logo'
 import { cn } from '@/lib/cn'
 import { copyText } from '@/lib/clipboard'
+import { formatChatTime } from '@/lib/format'
 import type { Action } from '@/api/types'
 import { ActionCard } from './ActionCard'
 import { CardRenderer } from './cards/Cards'
@@ -42,6 +43,16 @@ function CopyAction({ text }: { text: string }) {
   )
 }
 
+/** 카카오톡처럼 말풍선 옆에 붙는 작은 시각 ("오전 10:32") */
+function MessageTime({ iso, className }: { iso: string | null | undefined; className?: string }) {
+  const text = formatChatTime(iso)
+  if (!text) return null
+  return (
+    <time dateTime={iso ?? undefined} className={cn('shrink-0 whitespace-nowrap pb-0.5 text-[11px] leading-none text-subtle tabular', className)}>
+      {text}
+    </time>
+  )
+}
 function TypingDots() {
   return (
     <div className="flex items-center gap-1 py-2" role="status" aria-label="답변 생성 중">
@@ -138,8 +149,11 @@ function UserMessage({ message, busy, onEdit }: Pick<Props, 'message' | 'busy' |
 
   return (
     <div className="group flex flex-col items-end">
-      <div className="max-w-[88%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-brand-soft px-4 py-2.5 leading-relaxed text-fg md:max-w-[80%]">
-        {message.content}
+      <div className="flex max-w-full items-end justify-end gap-1.5">
+        <MessageTime iso={message.createdAt} />
+        <div className="max-w-[88%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-brand-soft px-4 py-2.5 leading-relaxed text-fg md:max-w-[80%]">
+          {message.content}
+        </div>
       </div>
       <div className="-mb-2 mt-0.5 flex opacity-100 transition-opacity md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100">
         <CopyAction text={message.content} />
@@ -193,6 +207,7 @@ export const MessageItem = memo(function MessageItem({ message, isLast, live, bu
             답변을 끝까지 생성하지 못했어요.
           </p>
         )}
+        {!live && <MessageTime iso={message.createdAt} className="block pb-0" />}
         {!live && (message.content || failed || stopped) && (
           <div className={cn('-ml-2 -mb-2 flex opacity-100 transition-opacity', !isLast && 'md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100')}>
             {message.content && <CopyAction text={message.content} />}

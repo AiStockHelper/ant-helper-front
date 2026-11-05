@@ -10,8 +10,11 @@ import type {
   Conversation,
   ConversationDetail,
   CreateAccountRequest,
+  LoginChallenge,
   Me,
   OrderHistoryItem,
+  OrderRequestItem,
+  StepUpChallenge,
   OrderScope,
   PageResponse,
   AgentTask,
@@ -23,7 +26,11 @@ import type {
 export const authApi = {
   signup: (body: { email: string; password: string; nickname: string }) =>
     api.post<{ id: number; email: string; nickname: string }>('/auth/signup', body, { auth: false }),
-  login: (body: { email: string; password: string }) => api.post<AuthTokens>('/auth/login', body, { auth: false }),
+  login: (body: { email: string; password: string }) => api.post<LoginChallenge>('/auth/login', body, { auth: false }),
+  verifyLogin: (body: { challengeId: string; code: string }) =>
+    api.post<AuthTokens>('/auth/login/verify', body, { auth: false }),
+  stepUpRequest: () => api.post<StepUpChallenge>('/auth/step-up/request'),
+  stepUpVerify: (body: { challengeId: string; code: string }) => api.post<void>('/auth/step-up/verify', body),
   logout: () => api.post<void>('/auth/logout'),
   me: () => api.get<Me>('/auth/me'),
   updateMe: (body: { nickname: string }) => api.patch<Me>('/auth/me', body),
@@ -65,6 +72,18 @@ export const agentApi = {
   cancel: (id: number) => api.delete<AgentTask>(`/agent/tasks/${id}`),
   pauseAll: () => api.post<{ paused: number }>('/agent/pause-all'),
 }
+export const orderQueueApi = {
+  list: (p: { accountId?: number; status?: 'PENDING' | 'FAILED' | 'SUCCESS' } = {}) => {
+    const q = new URLSearchParams()
+    if (p.accountId != null) q.set('accountId', String(p.accountId))
+    if (p.status) q.set('status', p.status)
+    const qs = q.toString()
+    return api.get<OrderRequestItem[]>('/order-requests' + (qs ? '?' + qs : ''))
+  },
+  remove: (id: number) => api.delete<void>('/order-requests/' + id),
+  removeFailed: (accountId?: number) => api.delete<{ deleted: number }>('/order-requests' + (accountId != null ? '?accountId=' + accountId : '')),
+}
+
 export const chatApi = {
   conversations: (p: { q?: string; page: number; size: number }) => {
     const q = new URLSearchParams({ page: String(p.page), size: String(p.size) })
