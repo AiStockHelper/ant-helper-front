@@ -164,7 +164,8 @@ export function formatVolume(n: number | null | undefined): string {
 // ── 통화별 표기 (해외주식) ───────────────────────
 export type CurrencyCode = 'KRW' | 'USD'
 
-const CURRENCY_SYMBOL: Record<CurrencyCode, string> = { KRW: '₩', USD: '$' }
+/** 금액 뒤에 붙이는 단위. 원화와 달러가 헷갈리지 않도록 항상 표시한다. */
+const CURRENCY_UNIT: Record<CurrencyCode, string> = { KRW: '원', USD: '달러' }
 const usdFmt = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 /** 통화별 소수 자리. KRW 0, USD 2 */
@@ -183,28 +184,60 @@ export function formatAmount(n: number | null | undefined, currency: CurrencyCod
   return currency === 'USD' ? usdFmt.format(Math.abs(n) < 0.005 ? 0 : n) : nf.format(Math.round(n))
 }
 
-/** 통화 기호 포함: (KRW) "₩71,200", (USD) "$189.50". sign 이면 양수에 + */
+/** 단위가 붙은 금액: (KRW) "71,200원", (USD) "189.50달러". sign 이면 양수에 + 를 붙인다. */
 export function formatMoney(n: number | null | undefined, currency: CurrencyCode = 'KRW', opts: { sign?: boolean } = {}): string {
   if (!isNum(n)) return '-'
   const body = formatAmount(Math.abs(n), currency)
   const isZero = Number(body.replace(/,/g, '')) === 0
-  const symbol = CURRENCY_SYMBOL[currency]
-  if (n < 0 && !isZero) return `-${symbol}${body}`
-  if (opts.sign && n > 0 && !isZero) return `+${symbol}${body}`
-  return `${symbol}${body}`
+  const unit = CURRENCY_UNIT[currency]
+  if (n < 0 && !isZero) return `-${body}${unit}`
+  if (opts.sign && n > 0 && !isZero) return `+${body}${unit}`
+  return `${body}${unit}`
 }
 
-/** 부호 포함 숫자(기호 없음): (USD) 1.5 -> "+1.50" */
+/** 변동 금액(부호 포함, 단위 포함): (USD) 1.5 -> "+1.50달러" */
 export function formatSignedAmount(n: number | null | undefined, currency: CurrencyCode = 'KRW'): string {
   if (!isNum(n)) return '-'
   const body = formatAmount(Math.abs(n), currency)
   const isZero = Number(body.replace(/,/g, '')) === 0
-  if (isZero) return body
-  return n > 0 ? `+${body}` : `-${body}`
+  const unit = CURRENCY_UNIT[currency]
+  if (isZero) return `${body}${unit}`
+  return n > 0 ? `+${body}${unit}` : `-${body}${unit}`
+}
+
+/** 환율 표시: "1달러 = 1,380.50원" */
+export function formatExchangeRate(rate: number | null | undefined): string {
+  return isNum(rate) ? `1달러 = ${formatAmount(rate, 'USD')}원` : '-'
 }
 
 export type MarketCode = 'KRX' | 'NASDAQ' | 'NYSE' | 'AMEX'
 export function marketOf(x: { market?: string | null } | null | undefined): MarketCode {
   const m = x?.market
   return m === 'NASDAQ' || m === 'NYSE' || m === 'AMEX' ? m : 'KRX'
+}
+
+// ── 채팅 시각 (카카오톡 스타일) ───────────────────────────
+const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토']
+
+/** "오전 9:07" / "오후 3:30" — 메시지 옆에 붙이는 시각 */
+export function formatChatTime(v: string | number | Date | null | undefined): string {
+  const d = toDate(v)
+  if (!d) return ''
+  const h = d.getHours()
+  const period = h < 12 ? '오전' : '오후'
+  const h12 = h % 12 === 0 ? 12 : h % 12
+  return `${period} ${h12}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+/** "2026년 11월 5일 목요일" — 날짜가 바뀔 때 대화 사이에 넣는 구분선 */
+export function formatDayDivider(v: string | number | Date | null | undefined): string {
+  const d = toDate(v)
+  if (!d) return ''
+  return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 ${WEEKDAYS[d.getDay()]}요일`
+}
+
+export function sameDay(a: string | number | Date | null | undefined, b: string | number | Date | null | undefined): boolean {
+  const x = toDate(a)
+  const y = toDate(b)
+  return !!x && !!y && startOfDay(x) === startOfDay(y)
 }

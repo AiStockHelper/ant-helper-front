@@ -16,7 +16,7 @@ import { useAccounts } from '@/features/accounts/useAccounts'
 import { cn } from '@/lib/cn'
 import { SectionTitle, SummaryBlock } from '@/components/finance/Summary'
 import { Segmented } from '@/components/ui/Field'
-import { formatAmount, formatDate, formatTime, toDateInputValue } from '@/lib/format'
+import { formatDate, formatExchangeRate, formatTime, toDateInputValue } from '@/lib/format'
 import { AgentTaskManager, NoAgentTasks } from '@/features/agent/AgentTasks'
 import { OrderQueue } from '@/features/orderqueue/OrderQueue'
 import type { OrderScope, OrderStatus } from '@/api/types'
@@ -93,7 +93,7 @@ function Overview({ accountId }: { accountId: number }) {
             <SectionTitle
               aside={
                 <span className="flex items-center gap-2">
-                  {s.exchangeRate != null && <span className="tabular text-xs text-subtle">환율 {formatAmount(s.exchangeRate, 'USD')}원/$</span>}
+                  {s.exchangeRate != null && <span className="tabular text-xs text-subtle">환율 {formatExchangeRate(s.exchangeRate)}</span>}
                   <Badge tone="brand">해외 · USD</Badge>
                 </span>
               }

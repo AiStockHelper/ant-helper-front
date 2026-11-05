@@ -5,7 +5,11 @@ import {
   dateGroup,
   formatAmount,
   formatMoney,
+  formatChatTime,
+  formatDayDivider,
+  formatExchangeRate,
   formatSignedAmount,
+  sameDay,
   marketOf,
   parseDate,
   formatCompactKRW,
@@ -98,27 +102,30 @@ describe('dates', () => {
 })
 
 describe('currency formats', () => {
-  it('formatMoney: KRW 는 0자리 ₩, USD 는 2자리 $', () => {
-    expect(formatMoney(71200, 'KRW')).toBe('₩71,200')
-    expect(formatMoney(189.5, 'USD')).toBe('$189.50')
-    expect(formatMoney(1234567.891, 'USD')).toBe('$1,234,567.89')
-    expect(formatMoney(71200.4)).toBe('₩71,200')
+  it('formatMoney: 원화는 "원", 달러는 "달러"를 뒤에 붙여 구분한다', () => {
+    expect(formatMoney(71200, 'KRW')).toBe('71,200원')
+    expect(formatMoney(189.5, 'USD')).toBe('189.50달러')
+    expect(formatMoney(1234567.891, 'USD')).toBe('1,234,567.89달러')
+    expect(formatMoney(71200.4)).toBe('71,200원')
   })
   it('formatMoney: 음수/부호/0/무효값', () => {
-    expect(formatMoney(-12.3, 'USD')).toBe('-$12.30')
-    expect(formatMoney(12.3, 'USD', { sign: true })).toBe('+$12.30')
-    expect(formatMoney(-5000, 'KRW')).toBe('-₩5,000')
-    expect(formatMoney(0, 'USD', { sign: true })).toBe('$0.00')
-    expect(formatMoney(-0.001, 'USD')).toBe('$0.00')
+    expect(formatMoney(-12.3, 'USD')).toBe('-12.30달러')
+    expect(formatMoney(12.3, 'USD', { sign: true })).toBe('+12.30달러')
+    expect(formatMoney(-5000, 'KRW')).toBe('-5,000원')
+    expect(formatMoney(5000, 'KRW', { sign: true })).toBe('+5,000원')
+    expect(formatMoney(0, 'USD', { sign: true })).toBe('0.00달러')
+    expect(formatMoney(-0.001, 'USD')).toBe('0.00달러')
     expect(formatMoney(null, 'USD')).toBe('-')
     expect(formatMoney(Number.NaN)).toBe('-')
   })
-  it('formatAmount / formatSignedAmount', () => {
+  it('formatAmount(숫자만) / formatSignedAmount(부호+단위) / formatExchangeRate', () => {
     expect(formatAmount(189.5, 'USD')).toBe('189.50')
     expect(formatAmount(71200, 'KRW')).toBe('71,200')
-    expect(formatSignedAmount(1.5, 'USD')).toBe('+1.50')
-    expect(formatSignedAmount(-800, 'KRW')).toBe('-800')
-    expect(formatSignedAmount(0, 'USD')).toBe('0.00')
+    expect(formatSignedAmount(1.5, 'USD')).toBe('+1.50달러')
+    expect(formatSignedAmount(-800, 'KRW')).toBe('-800원')
+    expect(formatSignedAmount(0, 'USD')).toBe('0.00달러')
+    expect(formatExchangeRate(1380.5)).toBe('1달러 = 1,380.50원')
+    expect(formatExchangeRate(undefined)).toBe('-')
   })
   it('currencyDigits / currencyOf / marketOf 는 누락 필드를 국내로 본다', () => {
     expect(currencyDigits('USD')).toBe(2)
@@ -142,5 +149,25 @@ describe('parseDate', () => {
   it('잘못된 값은 null', () => {
     expect(parseDate('nope')).toBeNull()
     expect(parseDate(null)).toBeNull()
+  })
+})
+
+describe('chat time (카카오톡 스타일)', () => {
+  it('formatChatTime: 오전/오후 12시간제', () => {
+    expect(formatChatTime(new Date(2026, 10, 5, 0, 5))).toBe('오전 12:05')
+    expect(formatChatTime(new Date(2026, 10, 5, 9, 7))).toBe('오전 9:07')
+    expect(formatChatTime(new Date(2026, 10, 5, 12, 0))).toBe('오후 12:00')
+    expect(formatChatTime(new Date(2026, 10, 5, 15, 30))).toBe('오후 3:30')
+    expect(formatChatTime(null)).toBe('')
+    expect(formatChatTime('not-a-date')).toBe('')
+  })
+  it('formatDayDivider: 연월일과 요일', () => {
+    expect(formatDayDivider(new Date(2026, 10, 5, 10, 0))).toBe('2026년 11월 5일 목요일')
+    expect(formatDayDivider(new Date(2026, 0, 31, 23, 59))).toBe('2026년 1월 31일 토요일')
+  })
+  it('sameDay: 자정을 기준으로 날짜가 바뀐다', () => {
+    expect(sameDay(new Date(2026, 10, 5, 0, 0), new Date(2026, 10, 5, 23, 59))).toBe(true)
+    expect(sameDay(new Date(2026, 10, 5, 23, 59), new Date(2026, 10, 6, 0, 0))).toBe(false)
+    expect(sameDay(null, new Date())).toBe(false)
   })
 })

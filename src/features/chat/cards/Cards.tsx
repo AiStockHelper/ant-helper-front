@@ -17,7 +17,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { Badge } from '@/components/ui/Badge'
-import { currencyOf, formatAmount, formatDateTime, formatMoney, formatNumber, formatVolume, priceTone, toneClass } from '@/lib/format'
+import { currencyOf, formatDateTime, formatExchangeRate, formatMoney, formatNumber, formatVolume, priceTone, toneClass } from '@/lib/format'
 import { HoldingsList, OrderList } from '@/components/finance/Lists'
 import { DirectionBadge, MarketBadge, PriceChange, SideBadge, Stat } from '@/components/finance/parts'
 import { SectionTitle, SummaryBlock } from '@/components/finance/Summary'
@@ -339,7 +339,7 @@ function BalanceCard({ data }: { data: AccountSummary }) {
               aside={
                 <span className="flex items-center gap-1.5">
                   {data.exchangeRate != null && (
-                    <span className="tabular text-[11px] text-subtle">환율 {formatAmount(data.exchangeRate, 'USD')}원/$</span>
+                    <span className="tabular text-[11px] text-subtle">환율 {formatExchangeRate(data.exchangeRate)}</span>
                   )}
                   <Badge tone="brand">해외 · USD</Badge>
                 </span>
