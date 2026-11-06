@@ -9,6 +9,8 @@ import { Field, Segmented } from '@/components/ui/Field'
 import { useToast } from '@/components/ui/Toast'
 import { useAuth } from '@/features/auth/AuthContext'
 import { formatDate } from '@/lib/format'
+import { useCurrencyDisplay } from './CurrencyDisplayContext'
+import { UsdToggle } from './UsdToggle'
 import { useTheme, type ThemeMode } from './ThemeContext'
 
 function Section({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
@@ -24,6 +26,7 @@ function Section({ title, description, children }: { title: string; description?
 export function SettingsPage() {
   const { user, updateNickname, logout, deleteAccount } = useAuth()
   const { mode, setMode } = useTheme()
+  const { rate, rateSource } = useCurrencyDisplay()
   const toast = useToast()
   const navigate = useNavigate()
 
@@ -93,6 +96,12 @@ export function SettingsPage() {
             />
           </Section>
 
+          <Section title="해외 종목 금액 보기" description="미국 등 달러 종목의 금액을 달러로 볼지, 원화로 환산해 볼지 고를 수 있어요. 환산 금액은 참고용이라 실제 체결 환율과 다를 수 있어요.">
+            <UsdToggle className="w-full sm:w-auto" />
+            <p className="mt-2 text-xs text-subtle">
+              {rate ? `현재 환율 1달러 = ${rate.toLocaleString('ko-KR', { maximumFractionDigits: 2 })}원${rateSource ? ` (${rateSource})` : ''}` : '환율을 아직 가져오지 못했어요. 이때는 달러로 보여 드려요.'}
+            </p>
+          </Section>
           <Section title="계정">
             <div className="flex flex-col gap-2 sm:flex-row">
               <Button variant="outline" onClick={() => setConfirmLogout(true)}>

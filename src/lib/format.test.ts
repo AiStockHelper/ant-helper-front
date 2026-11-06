@@ -1,15 +1,20 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import {
   currencyDigits,
   currencyOf,
   dateGroup,
   formatAmount,
   formatMoney,
+  commaizeMoney,
   formatChatTime,
   formatDayDivider,
   formatExchangeRate,
   formatSignedAmount,
+  getUsdDisplay,
+  groupDigits,
+  setUsdDisplay,
   sameDay,
+  ungroup,
   marketOf,
   parseDate,
   formatCompactKRW,
@@ -169,5 +174,70 @@ describe('chat time (카카오톡 스타일)', () => {
     expect(sameDay(new Date(2026, 10, 5, 0, 0), new Date(2026, 10, 5, 23, 59))).toBe(true)
     expect(sameDay(new Date(2026, 10, 5, 23, 59), new Date(2026, 10, 6, 0, 0))).toBe(false)
     expect(sameDay(null, new Date())).toBe(false)
+  })
+})
+
+describe('달러 ↔ 원 보기 설정', () => {
+  afterEach(() => setUsdDisplay('USD', null))
+
+  it('기본은 달러 그대로, 원화 종목은 영향받지 않는다', () => {
+    expect(formatMoney(189.5, 'USD')).toBe('189.50달러')
+    setUsdDisplay('KRW', 1380)
+    expect(formatMoney(71200, 'KRW')).toBe('71,200원')
+  })
+
+  it('원화 환산: 환율을 곱해 약 N원으로 보여 준다', () => {
+    setUsdDisplay('KRW', 1380)
+    expect(formatMoney(100, 'USD')).toBe('약 138,000원')
+    expect(formatMoney(-2.5, 'USD')).toBe('-약 3,450원')
+    expect(formatMoney(2.5, 'USD', { sign: true })).toBe('+약 3,450원')
+    expect(formatSignedAmount(-1.5, 'USD')).toBe('-2,070원')
+  })
+
+  it('함께 보기: 달러와 환산 원화를 같이', () => {
+    setUsdDisplay('BOTH', 1380)
+    expect(formatMoney(100, 'USD')).toBe('100.00달러 (약 138,000원)')
+    expect(formatMoney(-100, 'USD')).toBe('-100.00달러 (-약 138,000원)')
+  })
+
+  it('환율을 모르면 달러로 보여 준다', () => {
+    setUsdDisplay('KRW', null)
+    expect(formatMoney(100, 'USD')).toBe('100.00달러')
+    setUsdDisplay('BOTH', Number.NaN)
+    expect(getUsdDisplay().rate).toBeNull()
+  })
+})
+
+describe('천 단위 쉼표', () => {
+  it('groupDigits / ungroup', () => {
+    expect(groupDigits('1234567')).toBe('1,234,567')
+    expect(groupDigits('1234567.50')).toBe('1,234,567.50')
+    expect(groupDigits('12a3,4')).toBe('1,234')
+    expect(groupDigits('999')).toBe('999')
+    expect(groupDigits('')).toBe('')
+    expect(groupDigits('1234.')).toBe('1,234.')
+    expect(ungroup('1,234,567.5')).toBe('1234567.5')
+  })
+
+  it('commaizeMoney: 쉼표 없는 큰 금액만 고친다', () => {
+    expect(commaizeMoney('삼성전자 1250000원 매수')).toBe('삼성전자 1,250,000원 매수')
+    expect(commaizeMoney('총 12345.67달러입니다')).toBe('총 12,345.67달러입니다')
+    expect(commaizeMoney('현재가 71200 원')).toBe('현재가 71,200 원')
+    expect(commaizeMoney('가격은 $12345.5 입니다')).toBe('가격은 $12,345.5 입니다')
+    expect(commaizeMoney('₩1250000')).toBe('₩1,250,000')
+  })
+
+  it('commaizeMoney: 이미 쉼표가 있거나 금액이 아닌 숫자는 그대로', () => {
+    expect(commaizeMoney('1,250,000원')).toBe('1,250,000원')
+    expect(commaizeMoney('200만원 어치')).toBe('200만원 어치')
+    expect(commaizeMoney('종목코드 005930 은 삼성전자')).toBe('종목코드 005930 은 삼성전자')
+    expect(commaizeMoney('거래량 1250000주')).toBe('거래량 1250000주')
+    expect(commaizeMoney('500원')).toBe('500원')
+    expect(commaizeMoney('2026년 11월 5일')).toBe('2026년 11월 5일')
+  })
+
+  it('commaizeMoney: 코드 블록은 건드리지 않는다', () => {
+    const src = '```\nprice = 1250000원\n```\n1250000원'
+    expect(commaizeMoney(src)).toBe('```\nprice = 1250000원\n```\n1,250,000원')
   })
 })

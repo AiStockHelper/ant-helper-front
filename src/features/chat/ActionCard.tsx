@@ -66,6 +66,7 @@ export function ActionCard({ action, onChange }: { action: Action; onChange: (a:
     onError: (e) => setError(errorMessage(e)),
   })
 
+  const isAgent = action.kind === 'AGENT_TASK' || action.kind === 'AGENT_TASK_UPDATE'
   const busy = approve.isPending || reject.isPending
   const info = statusInfo[status]
 
@@ -89,13 +90,13 @@ export function ActionCard({ action, onChange }: { action: Action; onChange: (a:
       {real && (
         <div className="flex items-center gap-2 bg-real-solid px-4 py-1.5 text-xs font-bold text-white">
           <ShieldAlert className="h-4 w-4" aria-hidden />
-          {action.kind === 'AGENT_TASK' ? '실전 계좌 · 승인하면 사람 확인 없이 실제 자금으로 자동 거래됩니다' : '실전 계좌 · 실제 자금으로 거래됩니다'}
+          {action.kind === 'AGENT_TASK_UPDATE' ? '실전 계좌 · 승인하면 다음 실행부터 바뀐 정리본대로 자동 거래됩니다' : isAgent ? '실전 계좌 · 승인하면 사람 확인 없이 실제 자금으로 자동 거래됩니다' : '실전 계좌 · 실제 자금으로 거래됩니다'}
         </div>
       )}
       <div className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-xs font-medium text-subtle">{action.kind === 'AGENT_TASK' ? '자동 실행 확인' : '주문 확인'}</p>
+            <p className="text-xs font-medium text-subtle">{action.kind === 'AGENT_TASK_UPDATE' ? '자동 실행 정리본 수정 확인' : isAgent ? '자동 실행 확인' : '주문 확인'}</p>
             <h3 className="mt-0.5 text-base font-bold leading-snug">{action.title}</h3>
           </div>
           <Badge tone={info.tone}>{info.label}</Badge>
@@ -110,12 +111,21 @@ export function ActionCard({ action, onChange }: { action: Action; onChange: (a:
               <span className="truncate">{action.accountLabel}</span>
             </dd>
           </div>
-          {action.details.map((d) => (
-            <div key={d.label} className="flex items-start justify-between gap-3 py-2.5">
-              <dt className="shrink-0 text-muted">{d.label}</dt>
-              <dd className="tabular min-w-0 break-words text-right font-medium">{d.value}</dd>
-            </div>
-          ))}
+          {action.details.map((d) =>
+            d.value.length > 40 || d.value.includes('\n') ? (
+              <div key={d.label} className="py-2.5">
+                <dt className="text-muted">{d.label}</dt>
+                <dd className="mt-1.5 max-h-72 overflow-y-auto whitespace-pre-wrap break-words rounded-lg bg-surface p-2.5 text-[13px] font-normal leading-relaxed">
+                  {d.value}
+                </dd>
+              </div>
+            ) : (
+              <div key={d.label} className="flex items-start justify-between gap-3 py-2.5">
+                <dt className="shrink-0 text-muted">{d.label}</dt>
+                <dd className="tabular min-w-0 break-words text-right font-medium">{d.value}</dd>
+              </div>
+            ),
+          )}
         </dl>
 
         {status === 'PENDING' && (
@@ -130,7 +140,7 @@ export function ActionCard({ action, onChange }: { action: Action; onChange: (a:
               <div className="mt-3 rounded-xl border border-real/50 bg-real-soft p-3.5">
                 <p className="flex items-start gap-2 text-sm font-semibold text-real">
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-                  {action.kind === 'AGENT_TASK' ? '한 번 더 확인해 주세요. 승인하면 정해진 일정마다 실전 계좌에서 자동으로 주문이 나갑니다.' : '한 번 더 확인해 주세요. 승인 즉시 실전 계좌에 반영되며 되돌릴 수 없습니다.'}
+                  {isAgent ? '한 번 더 확인해 주세요. 승인하면 정해진 일정마다 실전 계좌에서 바뀐 내용대로 자동 주문이 나갑니다.' : '한 번 더 확인해 주세요. 승인 즉시 실전 계좌에 반영되며 되돌릴 수 없습니다.'}
                 </p>
                 <label className="mt-3 flex min-h-[44px] cursor-pointer items-center gap-2.5 text-sm">
                   <input
@@ -139,7 +149,7 @@ export function ActionCard({ action, onChange }: { action: Action; onChange: (a:
                     onChange={(e) => setAgreed(e.target.checked)}
                     className="h-5 w-5 shrink-0 accent-[rgb(var(--real-solid))]"
                   />
-                  <span>{action.kind === 'AGENT_TASK' ? '위 내용과 한도를 확인했으며 실전 계좌의 자동 주문에 동의합니다.' : '위 주문 내용을 확인했으며 실전 주문 실행에 동의합니다.'}</span>
+                  <span>{isAgent ? '위 정리본과 한도를 확인했으며 실전 계좌의 자동 주문에 동의합니다.' : '위 주문 내용을 확인했으며 실전 주문 실행에 동의합니다.'}</span>
                 </label>
               </div>
             )}
@@ -161,7 +171,7 @@ export function ActionCard({ action, onChange }: { action: Action; onChange: (a:
                 loading={approve.isPending}
                 disabled={busy || (real && confirming && !agreed)}
               >
-                {real && confirming ? (action.kind === 'AGENT_TASK' ? '자동 실행 시작' : '실전 주문 실행') : real ? '승인…' : '승인'}
+                {real && confirming ? (action.kind === 'AGENT_TASK_UPDATE' ? '정리본 수정 적용' : isAgent ? '자동 실행 시작' : '실전 주문 실행') : real ? '승인…' : '승인'}
               </Button>
             </div>
           </>

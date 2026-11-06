@@ -184,9 +184,23 @@ export function formatAmount(n: number | null | undefined, currency: CurrencyCod
   return currency === 'USD' ? usdFmt.format(Math.abs(n) < 0.005 ? 0 : n) : nf.format(Math.round(n))
 }
 
-/** 단위가 붙은 금액: (KRW) "71,200원", (USD) "189.50달러". sign 이면 양수에 + 를 붙인다. */
-export function formatMoney(n: number | null | undefined, currency: CurrencyCode = 'KRW', opts: { sign?: boolean } = {}): string {
-  if (!isNum(n)) return '-'
+// ── 달러 종목 금액을 어떻게 보여줄지 (USD 달러 / KRW 원화 환산 / BOTH 함께) ──────────────
+export type UsdDisplay = 'USD' | 'KRW' | 'BOTH'
+
+let usdDisplay: UsdDisplay = 'USD'
+let usdKrw: number | null = null
+
+/** 화면 전체가 같은 설정을 쓰도록 모듈에 보관한다. 환율이 없으면 달러 그대로 보여 준다. */
+export function setUsdDisplay(mode: UsdDisplay, rate: number | null) {
+  usdDisplay = mode
+  usdKrw = rate != null && Number.isFinite(rate) && rate > 0 ? rate : null
+}
+
+export function getUsdDisplay(): { mode: UsdDisplay; rate: number | null } {
+  return { mode: usdDisplay, rate: usdKrw }
+}
+
+function plain(n: number, currency: CurrencyCode, opts: { sign?: boolean }): string {
   const body = formatAmount(Math.abs(n), currency)
   const isZero = Number(body.replace(/,/g, '')) === 0
   const unit = CURRENCY_UNIT[currency]
@@ -195,16 +209,30 @@ export function formatMoney(n: number | null | undefined, currency: CurrencyCode
   return `${body}${unit}`
 }
 
+/** 단위가 붙은 금액: (KRW) "71,200원", (USD) "189.50달러". sign 이면 양수에 + 를 붙인다.
+ *  달러 종목은 보기 설정에 따라 "약 261,531원" 또는 "189.50달러 (약 261,531원)" 로 바뀐다(환율을 알 때만). */
+export function formatMoney(n: number | null | undefined, currency: CurrencyCode = 'KRW', opts: { sign?: boolean } = {}): string {
+  if (!isNum(n)) return '-'
+  if (currency === 'USD' && usdDisplay !== 'USD' && usdKrw) {
+    const won = `약 ${plain(n * usdKrw, 'KRW', opts)}`.replace('약 -', '-약 ').replace('약 +', '+약 ')
+    return usdDisplay === 'KRW' ? won : `${plain(n, 'USD', opts)} (${won})`
+  }
+  return plain(n, currency, opts)
+}
+
 /** 변동 금액(부호 포함, 단위 포함): (USD) 1.5 -> "+1.50달러" */
 export function formatSignedAmount(n: number | null | undefined, currency: CurrencyCode = 'KRW'): string {
   if (!isNum(n)) return '-'
   const body = formatAmount(Math.abs(n), currency)
   const isZero = Number(body.replace(/,/g, '')) === 0
+  if (currency === 'USD' && usdDisplay === 'KRW' && usdKrw) {
+    const won = formatAmount(Math.abs(n) * usdKrw, 'KRW')
+    return Number(won.replace(/,/g, '')) === 0 ? `${won}원` : `${n > 0 ? '+' : '-'}${won}원`
+  }
   const unit = CURRENCY_UNIT[currency]
   if (isZero) return `${body}${unit}`
   return n > 0 ? `+${body}${unit}` : `-${body}${unit}`
 }
-
 /** 환율 표시: "1달러 = 1,380.50원" */
 export function formatExchangeRate(rate: number | null | undefined): string {
   return isNum(rate) ? `1달러 = ${formatAmount(rate, 'USD')}원` : '-'
@@ -240,4 +268,42 @@ export function sameDay(a: string | number | Date | null | undefined, b: string 
   const x = toDate(a)
   const y = toDate(b)
   return !!x && !!y && startOfDay(x) === startOfDay(y)
+}
+
+// ── 금액 입력·본문 속 숫자에 천 단위 쉼표 ─────────────────────────
+
+/** "1234567.5" -> "1,234,567.5". 숫자와 소수점 외의 글자는 버린다(입력창에서 쓴다). */
+export function groupDigits(raw: string): string {
+  const cleaned = raw.replace(/[^\d.]/g, '')
+  const dot = cleaned.indexOf('.')
+  const intPart = dot >= 0 ? cleaned.slice(0, dot) : cleaned
+  const frac = dot >= 0 ? cleaned.slice(dot + 1).replace(/\./g, '') : null
+  const grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  return frac === null ? grouped : `${grouped}.${frac}`
+}
+
+/** 입력창의 값(쉼표 포함 가능)을 숫자 문자열로 되돌린다. */
+export function ungroup(display: string): string {
+  return display.replace(/[^\d.]/g, '')
+}
+
+// 뒷부분만 보는 전방탐색만 쓴다(오래된 사파리는 lookbehind 를 지원하지 않는다).
+const MONEY_AFTER = /(^|[^\d,.])(\d{4,})(\.\d+)?(?=\s?(?:원|달러|USD|KRW))/g
+const MONEY_AFTER_SYMBOL = /([$₩])(\d{4,})(\.\d+)?(?![\d,])/g
+
+/**
+ * AI 답변처럼 사람이 쓰지 않은 글에서 쉼표 없는 큰 금액("1250000원", "$12345.5")에 천 단위 쉼표를 넣는다.
+ * 코드 블록(```)은 건드리지 않는다. 이미 쉼표가 있는 숫자와 "200만원" 같은 표현은 그대로 둔다.
+ */
+export function commaizeMoney(text: string): string {
+  return text
+    .split(/(```[\s\S]*?```)/g)
+    .map((part, i) =>
+      i % 2 === 1
+        ? part
+        : part
+            .replace(MONEY_AFTER, (_m, pre: string, int: string, frac?: string) => pre + groupDigits(int) + (frac ?? ''))
+            .replace(MONEY_AFTER_SYMBOL, (_m, sym: string, int: string, frac?: string) => sym + groupDigits(int) + (frac ?? '')),
+    )
+    .join('')
 }

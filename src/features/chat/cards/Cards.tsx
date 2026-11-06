@@ -215,6 +215,7 @@ function RecommendationsCard({ data }: { data: Recommendation[] }) {
       title={
         <>
           모델 추천 TOP {data.length}
+          <span className="text-xs font-normal text-subtle">변동성 낮고 단기 눌린 종목 기준</span>
           {data[0]?.asOf && <span className="text-xs font-normal text-subtle">{data[0].asOf} 마감 기준</span>}
         </>
       }
@@ -248,21 +249,20 @@ function RecommendationsCard({ data }: { data: Recommendation[] }) {
                     </button>
                     <div className="tabular flex items-center gap-2 text-sm">
                       <span>{formatMoney(r.currentPrice, cur)}</span>
-                      <PriceChange rate={r.predictedChangeRate} showAmount={false} className="text-sm" />
                     </div>
                   </div>
-                  <div className="mt-1.5 flex items-center gap-2">
-                    <DirectionBadge direction={r.direction} />
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
                     <div className="h-1.5 w-20 overflow-hidden rounded-full bg-surface-3" aria-hidden>
-                      <div className="h-full rounded-full bg-brand" style={{ width: `${Math.max(0, Math.min(100, r.confidence))}%` }} />
+                      <div className="h-full rounded-full bg-brand" style={{ width: `${Math.max(0, Math.min(100, Number(r.score)))}%` }} />
                     </div>
-                    <span className="tabular text-xs text-subtle">
-                      신뢰도 {Math.round(r.confidence)}% · 점수 {Number(r.score).toFixed(1)}
+                    <span className="tabular text-xs font-medium">점수 {Number(r.score).toFixed(1)}</span>
+                    <span className="flex items-center gap-1 text-xs text-subtle">
+                      단기 모델(참고) <DirectionBadge direction={r.direction} />
                     </span>
                   </div>
                   {r.reasons?.length > 0 && (
                     <ul className="mt-2 space-y-0.5 text-xs text-muted">
-                      {r.reasons.slice(0, 3).map((reason) => (
+                      {r.reasons.slice(0, 4).map((reason) => (
                         <li key={reason} className="flex gap-1.5">
                           <span aria-hidden>·</span>
                           <span>{reason}</span>

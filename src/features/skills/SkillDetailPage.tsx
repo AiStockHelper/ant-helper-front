@@ -17,6 +17,7 @@ import { useAccounts } from '@/features/accounts/useAccounts'
 import { AgentTaskManager } from '@/features/agent/AgentTasks'
 import { Markdown } from '@/features/chat/Markdown'
 import { cn } from '@/lib/cn'
+import { groupDigits, ungroup } from '@/lib/format'
 import type { Skill, SkillParam } from '@/api/types'
 
 type Values = Record<string, string | boolean>
@@ -65,14 +66,16 @@ function ParamInput({ param, value, onChange, error }: { param: SkillParam; valu
       </label>
     )
   }
+  // 금액(시드)은 입력하는 동안에도 천 단위 쉼표가 보이게 한다. 상태에는 쉼표 없는 숫자만 보관한다.
+  const money = param.type === 'NUMBER' && param.key === 'budget'
   return (
     <Field
       label={param.label + (param.required ? '' : ' (선택)')}
-      type={param.type === 'NUMBER' ? 'number' : 'text'}
-      inputMode={param.type === 'NUMBER' ? 'decimal' : undefined}
-      step={param.type === 'NUMBER' ? 'any' : undefined}
-      value={String(value)}
-      onChange={(e) => onChange(e.target.value)}
+      type={param.type === 'NUMBER' && !money ? 'number' : 'text'}
+      inputMode={money ? 'numeric' : param.type === 'NUMBER' ? 'decimal' : undefined}
+      step={param.type === 'NUMBER' && !money ? 'any' : undefined}
+      value={money ? groupDigits(String(value)) : String(value)}
+      onChange={(e) => onChange(money ? ungroup(e.target.value) : e.target.value)}
       error={error}
       hint={hint}
       suffix={param.unit ? <span className="pr-2 text-xs text-subtle">{param.unit}</span> : undefined}
@@ -175,7 +178,7 @@ function StartForm({ skill }: { skill: Skill }) {
     )
   }
 
-  const budgetText = skill.params.some((p) => p.key === 'budget') ? `${values.budget || '-'} ${values.market === 'US' ? '달러' : '원'}` : null
+  const budgetText = skill.params.some((p) => p.key === 'budget') ? `${values.budget ? groupDigits(String(values.budget)) : '-'}${values.market === 'US' ? '달러' : '원'}` : null
 
   return (
     <div className="space-y-4">
