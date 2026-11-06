@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Bot, MessageSquare, Pause, Play, Square, Zap } from 'lucide-react'
+import { Bot, MessageSquare, Pause, Pencil, Play, Plus, Square, Zap } from 'lucide-react'
 import { agentApi, skillsApi } from '@/api/endpoints'
 import { errorMessage } from '@/api/client'
 import { AgentStatusBadge, EmptyState, MarketBadge, PnL, SideBadge, Stat } from '@/components/finance/parts'
@@ -12,7 +12,7 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
 import { cn } from '@/lib/cn'
 import { formatDateTime, formatMoney, formatRate } from '@/lib/format'
-import type { AgentPosition, AgentRun, AgentTask, AgentTrade, Skill } from '@/api/types'
+import type { AgentPosition, AgentRevision, AgentRun, AgentTask, AgentTrade, Skill } from '@/api/types'
 
 const live = (t: AgentTask) => t.status === 'ACTIVE' || t.status === 'RUNNING' || t.status === 'PAUSED'
 
@@ -300,6 +300,119 @@ function configRows(task: AgentTask, skill: Skill | undefined): [string, string]
     })
 }
 
+const MAX_INSTRUCTION = 4000
+
+/**
+ * 걸어 둔 지시(정리본) 보기·수정·추가. 저장하면 다음 실행부터 새 내용으로 동작하고 이전 내용은 이력에 남는다.
+ * 실전 계좌에서 자동 주문하는 작업은 저장할 때 이메일 인증번호를 한 번 더 확인한다(창이 자동으로 뜬다).
+ */
+function InstructionSection({ task, revisions }: { task: AgentTask; revisions: AgentRevision[] }) {
+  const qc = useQueryClient()
+  const toast = useToast()
+  const [mode, setMode] = useState<'view' | 'edit' | 'append'>('view')
+  const [title, setTitle] = useState(task.title)
+  const [text, setText] = useState('')
+  const editable = !task.skillId && (task.status === 'ACTIVE' || task.status === 'RUNNING' || task.status === 'PAUSED')
+
+  const save = useMutation({
+    mutationFn: () =>
+      mode === 'append'
+        ? agentApi.update(task.id, { instruction: text, mode: 'APPEND' })
+        : agentApi.update(task.id, { title: title.trim() || undefined, instruction: text, mode: 'REPLACE' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['agent'] })
+      toast.success(mode === 'append' ? '추가 지시를 저장했어요. 다음 실행부터 적용돼요.' : '정리본을 수정했어요. 다음 실행부터 적용돼요.')
+      setMode('view')
+    },
+    onError: (e) => toast.error(errorMessage(e)),
+  })
+
+  const startEdit = () => {
+    setTitle(task.title)
+    setText(task.instruction ?? '')
+    setMode('edit')
+  }
+  const startAppend = () => {
+    setText('')
+    setMode('append')
+  }
+  const over = mode === 'append' ? (task.instruction?.length ?? 0) + text.length + 30 > MAX_INSTRUCTION : text.length > MAX_INSTRUCTION
+
+  return (
+    <Section title="지시 내용 (정리본)">
+      {mode === 'view' ? (
+        <>
+          <p className="whitespace-pre-wrap rounded-xl bg-surface-2 p-3 text-sm">{task.instruction}</p>
+          {editable && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" onClick={startEdit}>
+                <Pencil className="h-3.5 w-3.5" /> 수정
+              </Button>
+              <Button size="sm" variant="outline" onClick={startAppend}>
+                <Plus className="h-3.5 w-3.5" /> 지시 추가
+              </Button>
+            </div>
+          )}
+          {task.skillId && <p className="mt-2 text-xs text-subtle">스킬로 켠 작업은 스킬 화면에서 설정을 바꿀 수 있어요.</p>}
+          {revisions.length > 0 && (
+            <details className="mt-3 text-sm">
+              <summary className="cursor-pointer select-none text-muted">이전 정리본 {revisions.length}건</summary>
+              <ul className="mt-2 space-y-2">
+                {revisions.map((r, i) => (
+                  <li key={`${r.at}-${i}`} className="rounded-xl border border-border p-3">
+                    <p className="text-xs text-subtle">
+                      {formatDateTime(r.at)}에 {r.by === 'CHAT' ? '채팅 승인으로' : '화면에서'} 바뀌기 전 내용{r.title ? ` · ${r.title}` : ''}
+                    </p>
+                    <p className="mt-1 whitespace-pre-wrap text-[13px] text-muted">{r.instruction}</p>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </>
+      ) : (
+        <div className="space-y-3">
+          {mode === 'edit' && (
+            <label className="block text-sm">
+              <span className="mb-1.5 block font-medium">제목</span>
+              <input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                maxLength={200}
+                className="h-11 w-full rounded-xl border border-border-strong bg-surface px-3.5 md:h-10"
+              />
+            </label>
+          )}
+          <label className="block text-sm">
+            <span className="mb-1.5 block font-medium">{mode === 'append' ? '추가할 지시' : '정리본 전체'}</span>
+            <textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              rows={mode === 'append' ? 5 : 12}
+              placeholder={mode === 'append' ? '예: 손절은 -3%로 바꾸고, 하루에 한 종목만 사 줘' : ''}
+              className="w-full resize-y rounded-xl border border-border-strong bg-surface p-3 text-sm leading-relaxed"
+            />
+            <span className={cn('mt-1 block text-xs', over ? 'text-danger' : 'text-subtle')}>
+              {mode === 'append' ? `추가 후 전체 ${((task.instruction?.length ?? 0) + text.length).toLocaleString('ko-KR')}자` : `${text.length.toLocaleString('ko-KR')}자`} / 최대{' '}
+              {MAX_INSTRUCTION.toLocaleString('ko-KR')}자
+            </span>
+          </label>
+          {task.autonomous && task.accountType === 'REAL_TRADE' && (
+            <p className="rounded-lg bg-real-soft px-3 py-2 text-xs text-real">실전 계좌의 자동 주문 지시를 바꾸는 것이라 저장할 때 이메일 인증번호를 한 번 더 확인해요.</p>
+          )}
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setMode('view')} disabled={save.isPending}>
+              취소
+            </Button>
+            <Button variant="primary" onClick={() => save.mutate()} loading={save.isPending} disabled={!text.trim() || over}>
+              저장
+            </Button>
+          </div>
+        </div>
+      )}
+    </Section>
+  )
+}
 export function AgentTaskDetailDialog({ id, onClose }: { id: number | null; onClose: () => void }) {
   const q = useQuery({
     queryKey: ['agent', 'detail', id],
@@ -422,11 +535,7 @@ export function AgentTaskDetailDialog({ id, onClose }: { id: number | null; onCl
             )}
           </Section>
 
-          {t.instruction && (
-            <Section title="지시 내용">
-              <p className="whitespace-pre-wrap rounded-xl bg-surface-2 p-3 text-sm">{t.instruction}</p>
-            </Section>
-          )}
+          {(t.instruction || !t.skillId) && <InstructionSection task={t} revisions={d.revisions ?? []} />}
 
           {d.memory && (
             <Section title="AI가 남긴 메모">
