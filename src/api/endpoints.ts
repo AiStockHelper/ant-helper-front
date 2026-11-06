@@ -70,6 +70,9 @@ export const agentApi = {
   runNow: (id: number) => api.post<void>(`/agent/tasks/${id}/run`),
   liquidate: (id: number) => api.post<{ orders: number; lines: string[] }>(`/agent/tasks/${id}/liquidate`),
   cancel: (id: number) => api.delete<AgentTask>(`/agent/tasks/${id}`),
+  /** 걸어 둔 지시(정리본)·제목 수정. mode=APPEND 면 기존 정리본 뒤에 추가 지시로 덧붙인다. */
+  update: (id: number, body: { title?: string; instruction?: string; mode?: 'REPLACE' | 'APPEND' }) =>
+    api.patch<AgentTask>(`/agent/tasks/${id}`, body),
   pauseAll: () => api.post<{ paused: number }>('/agent/pause-all'),
 }
 export const orderQueueApi = {

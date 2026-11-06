@@ -248,7 +248,7 @@ export interface Card {
   data: any
 }
 
-export type ActionKind = 'ORDER' | 'AGENT_TASK' | 'SCHEDULED_ORDER' | 'SCHEDULED_RECOMMEND_BUY'
+export type ActionKind = 'ORDER' | 'AGENT_TASK' | 'AGENT_TASK_UPDATE' | 'SCHEDULED_ORDER' | 'SCHEDULED_RECOMMEND_BUY'
 export type ActionStatus = 'PENDING' | 'APPROVED' | 'EXECUTED' | 'REJECTED' | 'FAILED' | 'EXPIRED'
 
 export interface Action {
@@ -435,6 +435,16 @@ export interface AgentTaskDetail {
   trades: AgentTrade[]
   runs: AgentRun[]
   memory?: string | null
+  /** 정리본을 고치기 전의 모습들(최신순) */
+  revisions?: AgentRevision[]
+}
+
+/** 지시(정리본)를 고치기 전의 내용 */
+export interface AgentRevision {
+  at: string
+  by: string
+  title: string | null
+  instruction: string | null
 }
 
 export interface SkillParam {
