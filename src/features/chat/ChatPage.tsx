@@ -14,6 +14,7 @@ import { useAuth } from '@/features/auth/AuthContext'
 import { useAccounts } from '@/features/accounts/useAccounts'
 import { cn } from '@/lib/cn'
 import { formatDayDivider, sameDay } from '@/lib/format'
+import { UsdToggle } from '@/features/settings/UsdToggle'
 import { ChatUiContext } from './ChatContext'
 import { Composer } from './Composer'
 import { MessageItem } from './MessageItem'
@@ -199,6 +200,7 @@ export function ChatPage() {
             <Menu className="h-5 w-5" />
           </Button>
           <h1 className="min-w-0 flex-1 truncate px-1 text-base font-semibold md:text-lg">{title}</h1>
+          <UsdToggle className="hidden sm:inline-flex" />
           <AccountSelect
             accounts={accounts}
             value={selectedAccountId}

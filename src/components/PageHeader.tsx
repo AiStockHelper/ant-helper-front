@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { UsdToggle } from '@/features/settings/UsdToggle'
 
 export function PageHeader({ title, description, actions }: { title: string; description?: ReactNode; actions?: ReactNode }) {
   return (
@@ -8,6 +9,7 @@ export function PageHeader({ title, description, actions }: { title: string; des
           <h1 className="truncate text-lg font-bold md:text-xl">{title}</h1>
           {description && <p className="truncate text-xs text-muted">{description}</p>}
         </div>
+        <UsdToggle className="hidden sm:inline-flex" />
         {actions}
       </div>
     </header>
