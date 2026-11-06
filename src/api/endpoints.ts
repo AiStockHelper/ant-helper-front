@@ -50,6 +50,12 @@ export const accountsApi = {
     ),
 }
 
+export const marketApi = {
+  /** 1달러가 몇 원인지. 구하지 못하면 usdKrw 가 null */
+  exchangeRate: (accountId?: number) =>
+    api.get<{ usdKrw: number | null; source: string | null; asOf: string | null }>('/stocks/exchange-rate' + (accountId != null ? '?accountId=' + accountId : '')),
+}
+
 export const skillsApi = {
   list: () => api.get<Skill[]>('/skills'),
 }

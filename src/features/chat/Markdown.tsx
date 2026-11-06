@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom'
 import { Check, Copy } from 'lucide-react'
 import { copyText } from '@/lib/clipboard'
 import { cn } from '@/lib/cn'
+import { commaizeMoney } from '@/lib/format'
 
 function CodeBlock({ children }: { children?: ReactNode }) {
   const [copied, setCopied] = useState(false)
@@ -64,7 +65,7 @@ export const Markdown = memo(function Markdown({ text, streaming, className }: {
   return (
     <div className={cn('md', streaming && 'md-streaming', className)}>
       <ReactMarkdown remarkPlugins={plugins} components={components}>
-        {text}
+        {commaizeMoney(text)}
       </ReactMarkdown>
     </div>
   )
