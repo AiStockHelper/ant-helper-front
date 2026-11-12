@@ -488,6 +488,13 @@ export interface UpdateAgentTaskRequest {
   confirmRealTrading?: boolean
 }
 
+/** 계좌와 동기화한 결과. tasks: 확인한 작업 수, changedTasks: 장부가 바뀐 작업 수, lines: 바뀐 내용 */
+export interface AgentSyncResult {
+  tasks: number
+  changedTasks: number
+  lines: string[]
+}
+
 export interface CreateAgentTaskRequest {
   accountId: number
   skillId: string
