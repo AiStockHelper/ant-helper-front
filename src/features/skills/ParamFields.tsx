@@ -76,6 +76,26 @@ export function ParamInput({
       )}
     </>
   )
+  if (param.type === 'SELECT' && (param.options?.length ?? 0) > 4) {
+    // 선택지가 많으면 한 줄에 다 담기지 않으므로 드롭다운으로 보여 준다.
+    return (
+      <label className="block text-sm">
+        <span className="mb-1.5 block font-medium">{param.label}</span>
+        <select
+          value={String(value)}
+          onChange={(e) => onChange(e.target.value)}
+          className="h-11 w-full rounded-xl border border-border-strong bg-surface px-3 text-sm md:h-10"
+        >
+          {(param.options ?? []).map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+        {param.help && <span className="mt-1.5 block text-xs text-subtle">{param.help}</span>}
+      </label>
+    )
+  }
   if (param.type === 'SELECT') {
     return (
       <div>
