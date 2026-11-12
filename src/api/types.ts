@@ -470,6 +470,24 @@ export interface Skill {
   params: SkillParam[]
 }
 
+/**
+ * 자동 실행 수정 요청. 보낸 항목만 바뀐다.
+ * 스킬 작업은 config(바꿀 설정값만)로 시드·일정·한도가 다시 계산되고, 일반 작업은 한도(budget 등)·일정을 직접 바꾼다.
+ * 실전 계좌의 자율 주문 작업에서 설정·한도·일정을 바꿀 땐 confirmRealTrading 이 필요하다.
+ */
+export interface UpdateAgentTaskRequest {
+  title?: string
+  instruction?: string
+  mode?: 'REPLACE' | 'APPEND'
+  config?: Record<string, unknown>
+  budget?: number
+  maxPositionPct?: number
+  maxLossPct?: number
+  maxDailyBuy?: number
+  schedule?: Schedule
+  confirmRealTrading?: boolean
+}
+
 export interface CreateAgentTaskRequest {
   accountId: number
   skillId: string

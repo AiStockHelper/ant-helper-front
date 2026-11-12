@@ -1,7 +1,7 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Bot, MessageSquare, Pause, Pencil, Play, Plus, Square, Zap } from 'lucide-react'
+import { Bot, ChevronDown, MessageSquare, Pause, Pencil, Play, Plus, Square, Zap } from 'lucide-react'
 import { agentApi, skillsApi } from '@/api/endpoints'
 import { errorMessage } from '@/api/client'
 import { AgentStatusBadge, EmptyState, MarketBadge, PnL, SideBadge, Stat } from '@/components/finance/parts'
@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/Button'
 import { ConfirmDialog, Dialog } from '@/components/ui/Dialog'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
+import { TaskEditDialog } from '@/features/agent/TaskEditDialog'
 import { cn } from '@/lib/cn'
 import { formatDateTime, formatMoney, formatRate } from '@/lib/format'
 import type { AgentPosition, AgentRevision, AgentRun, AgentTask, AgentTrade, Skill } from '@/api/types'
@@ -209,10 +210,13 @@ export function AgentTaskManager({ tasks, showAccount }: { tasks: AgentTask[]; s
   )
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Section({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
   return (
     <section className="mt-5 first:mt-0">
-      <h3 className="mb-2 text-sm font-bold">{title}</h3>
+      <div className="mb-2 flex min-h-[32px] items-center justify-between gap-2">
+        <h3 className="text-sm font-bold">{title}</h3>
+        {action}
+      </div>
       {children}
     </section>
   )
@@ -264,28 +268,134 @@ function TradeRow({ t }: { t: AgentTrade }) {
   )
 }
 
-function RunRow({ r }: { r: AgentRun }) {
-  const tone = r.status === 'DONE' ? 'success' : r.status === 'FAILED' ? 'danger' : 'neutral'
-  const label = r.status === 'DONE' ? '완료' : r.status === 'FAILED' ? '실패' : '건너뜀'
+type RunFilter = 'ALL' | AgentRun['status']
+
+const RUN_LABEL: Record<AgentRun['status'], string> = { DONE: '완료', FAILED: '실패', SKIPPED: '건너뜀' }
+const RUN_TONE: Record<AgentRun['status'], 'success' | 'danger' | 'neutral'> = { DONE: 'success', FAILED: 'danger', SKIPPED: 'neutral' }
+const RUN_DOT: Record<AgentRun['status'], string> = { DONE: 'bg-success', FAILED: 'bg-danger', SKIPPED: 'bg-border-strong' }
+const RUN_PAGE = 5
+
+/** 요약의 첫 줄. 접힌 상태에서는 이것만 보여 줘서 목록이 길어지지 않게 한다. */
+const headline = (summary?: string | null) =>
+  (summary ?? '')
+    .split('\n')
+    .map((s) => s.trim())
+    .find(Boolean) ?? ''
+
+function RunItem({ r, open, onToggle }: { r: AgentRun; open: boolean; onToggle: () => void }) {
+  const lines = (r.summary ?? '').split('\n').filter((s) => s.trim()).length
+  const expandable = r.events.length > 0 || lines > 1 || headline(r.summary).length > 90
   return (
-    <li className="py-2.5">
-      <div className="flex items-center gap-1.5 text-xs text-subtle">
-        <Badge tone={tone}>{label}</Badge>
-        {r.manual && <Badge tone="neutral">수동</Badge>}
-        <span className="tabular">{formatDateTime(r.startedAt)}</span>
-      </div>
-      {r.summary && <p className="mt-1 whitespace-pre-line text-sm">{r.summary}</p>}
-      {r.events.length > 0 && (
-        <details className="mt-1 text-xs text-muted">
-          <summary className="cursor-pointer select-none">실행 과정 {r.events.length}건</summary>
-          <ul className="mt-1 list-disc space-y-0.5 pl-4">
-            {r.events.map((e, i) => (
-              <li key={i}>{e}</li>
-            ))}
-          </ul>
-        </details>
+    <li>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        disabled={!expandable}
+        className={cn('flex w-full items-start gap-2.5 rounded-lg px-2 py-2.5 text-left', expandable && 'hover:bg-surface-2')}
+      >
+        <span className={cn('mt-[7px] h-2 w-2 shrink-0 rounded-full', RUN_DOT[r.status])} aria-hidden />
+        <span className="min-w-0 flex-1">
+          <span className="flex flex-wrap items-center gap-1.5 text-xs text-subtle">
+            <Badge tone={RUN_TONE[r.status]}>{RUN_LABEL[r.status]}</Badge>
+            {r.manual && <Badge tone="neutral">수동</Badge>}
+            <span className="tabular">{formatDateTime(r.startedAt)}</span>
+            {r.events.length > 0 && <span>· 과정 {r.events.length}건</span>}
+          </span>
+          {r.summary && (
+            <span className={cn('mt-1 block text-sm', open ? 'whitespace-pre-line' : 'line-clamp-2')}>{open ? r.summary : headline(r.summary)}</span>
+          )}
+        </span>
+        {expandable && <ChevronDown className={cn('mt-1 h-4 w-4 shrink-0 text-subtle transition-transform', open && 'rotate-180')} aria-hidden />}
+      </button>
+      {open && r.events.length > 0 && (
+        <ul className="mb-2 ml-9 mr-2 max-h-64 list-disc space-y-0.5 overflow-y-auto rounded-lg bg-surface-2 py-2 pl-6 pr-3 text-xs text-muted">
+          {r.events.map((e, i) => (
+            <li key={i}>{e}</li>
+          ))}
+        </ul>
       )}
     </li>
+  )
+}
+
+/**
+ * 최근 실행 기록. 한 줄 요약만 보이고 눌러서 펼치며, 상태별로 걸러 볼 수 있다.
+ * 처음엔 5건만 보여 줘서 아래 내용(지시·설정)이 밀려나지 않는다.
+ */
+function RunList({ runs }: { runs: AgentRun[] }) {
+  const [filter, setFilter] = useState<RunFilter>('ALL')
+  const [shown, setShown] = useState(RUN_PAGE)
+  const [openIds, setOpenIds] = useState<Set<number>>(new Set())
+
+  const counts = useMemo(() => {
+    const c = { ALL: runs.length, DONE: 0, FAILED: 0, SKIPPED: 0 }
+    for (const r of runs) c[r.status]++
+    return c
+  }, [runs])
+  const filtered = filter === 'ALL' ? runs : runs.filter((r) => r.status === filter)
+  const visible = filtered.slice(0, shown)
+
+  const toggle = (id: number) =>
+    setOpenIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+
+  if (runs.length === 0) {
+    return <p className="text-sm text-muted">아직 기록된 실행이 없습니다. 아무 일도 없었던 점검은 기록하지 않습니다.</p>
+  }
+
+  const chips: { key: RunFilter; label: string }[] = [
+    { key: 'ALL', label: '전체' },
+    { key: 'DONE', label: '완료' },
+    { key: 'FAILED', label: '실패' },
+    { key: 'SKIPPED', label: '건너뜀' },
+  ]
+
+  return (
+    <div>
+      <div className="mb-2 flex flex-wrap items-center gap-1.5" role="group" aria-label="실행 기록 필터">
+        {chips
+          .filter((c) => c.key === 'ALL' || counts[c.key] > 0)
+          .map((c) => (
+            <button
+              key={c.key}
+              type="button"
+              aria-pressed={filter === c.key}
+              onClick={() => {
+                setFilter(c.key)
+                setShown(RUN_PAGE)
+              }}
+              className={cn(
+                'h-8 rounded-full border px-3 text-xs font-medium',
+                filter === c.key ? 'border-brand bg-brand-soft text-brand-text' : 'border-border text-muted hover:bg-surface-2',
+              )}
+            >
+              {c.label} <span className="tabular">{counts[c.key]}</span>
+            </button>
+          ))}
+        {openIds.size > 0 && (
+          <button type="button" onClick={() => setOpenIds(new Set())} className="ml-auto text-xs text-muted underline-offset-2 hover:underline">
+            모두 접기
+          </button>
+        )}
+      </div>
+      <ul className="divide-y divide-border">
+        {visible.map((r) => (
+          <RunItem key={r.id} r={r} open={openIds.has(r.id)} onToggle={() => toggle(r.id)} />
+        ))}
+      </ul>
+      {filtered.length > shown && (
+        <Button variant="ghost" size="sm" className="mt-1 w-full" onClick={() => setShown((n) => n + RUN_PAGE)}>
+          더 보기 ({filtered.length - shown}건 남음)
+        </Button>
+      )}
+      {filtered.length === 0 && <p className="py-3 text-sm text-muted">해당하는 기록이 없어요.</p>}
+      <p className="mt-2 text-[11px] text-subtle">최근 20건까지 보관해 보여 드려요.</p>
+    </div>
   )
 }
 
@@ -413,7 +523,57 @@ function InstructionSection({ task, revisions }: { task: AgentTask; revisions: A
     </Section>
   )
 }
+type TabKey = 'overview' | 'holdings' | 'runs' | 'settings'
+
+function TabBar({ value, onChange, items }: { value: TabKey; onChange: (k: TabKey) => void; items: { key: TabKey; label: string; count?: number }[] }) {
+  const move = (dir: 1 | -1) => {
+    const i = items.findIndex((it) => it.key === value)
+    onChange(items[(i + dir + items.length) % items.length].key)
+  }
+  return (
+    <div
+      role="tablist"
+      aria-label="자동 실행 상세"
+      className="-mx-1 mb-4 flex gap-0.5 overflow-x-auto border-b border-border px-1"
+      onKeyDown={(e) => {
+        if (e.key === 'ArrowRight') move(1)
+        else if (e.key === 'ArrowLeft') move(-1)
+      }}
+    >
+      {items.map((it) => {
+        const active = it.key === value
+        return (
+          <button
+            key={it.key}
+            type="button"
+            role="tab"
+            id={`agent-tab-${it.key}`}
+            aria-selected={active}
+            aria-controls={`agent-panel-${it.key}`}
+            tabIndex={active ? 0 : -1}
+            onClick={() => onChange(it.key)}
+            className={cn(
+              'relative shrink-0 px-3.5 py-3 text-sm font-medium transition-colors',
+              active ? 'text-fg after:absolute after:inset-x-2.5 after:-bottom-px after:h-0.5 after:rounded-full after:bg-brand' : 'text-muted hover:text-fg',
+            )}
+          >
+            {it.label}
+            {it.count != null && it.count > 0 && <span className="tabular ml-1 text-xs text-subtle">{it.count}</span>}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 export function AgentTaskDetailDialog({ id, onClose }: { id: number | null; onClose: () => void }) {
+  const [tab, setTab] = useState<TabKey>('overview')
+  const [editing, setEditing] = useState(false)
+  useEffect(() => {
+    setTab('overview')
+    setEditing(false)
+  }, [id])
+
   const q = useQuery({
     queryKey: ['agent', 'detail', id],
     queryFn: () => agentApi.detail(id!),
@@ -426,6 +586,14 @@ export function AgentTaskDetailDialog({ id, onClose }: { id: number | null; onCl
   const skill = skills.data?.find((s) => s.id === t?.skillId)
   const openPositions = d?.positions.filter((p) => p.status === 'OPEN') ?? []
   const closedPositions = d?.positions.filter((p) => p.status !== 'OPEN').slice(0, 10) ?? []
+  const isLive = !!t && (t.status === 'ACTIVE' || t.status === 'RUNNING' || t.status === 'PAUSED')
+  // 스킬 작업은 설정값으로, 일반 작업은 시드·한도로 고친다. AI가 만든 하위 작업의 한도는 상위 작업에서 바꾼다.
+  const canEditSettings = isLive && !!t && (t.skillId ? !!skill : !!t.ledger && !t.parentTaskId)
+  const editButton = canEditSettings && (
+    <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
+      <Pencil className="h-3.5 w-3.5" aria-hidden /> 수정
+    </Button>
+  )
 
   return (
     <Dialog
@@ -462,7 +630,7 @@ export function AgentTaskDetailDialog({ id, onClose }: { id: number | null; onCl
     >
       {q.isLoading || !d || !t ? (
         <div className="space-y-3">
-          <Skeleton className="h-16" />
+          <Skeleton className="h-10" />
           <Skeleton className="h-32" />
         </div>
       ) : q.isError ? (
@@ -473,88 +641,128 @@ export function AgentTaskDetailDialog({ id, onClose }: { id: number | null; onCl
             <div className="mb-4 rounded-xl bg-warning-soft px-3.5 py-2.5 text-sm text-warning">{t.pausedReason}</div>
           )}
 
-          <Section title="개요">
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
-              <Stat label="계좌" value={t.accountLabel} />
-              <Stat label="다음 실행" value={t.status === 'ACTIVE' && t.nextRunAt ? formatDateTime(t.nextRunAt) : '-'} />
-              <Stat label="마지막 실행" value={t.lastRunAt ? formatDateTime(t.lastRunAt) : '아직 없음'} />
-              <Stat label="실행 횟수" value={`${t.runCount}회${t.failCount > 0 ? ` (연속 실패 ${t.failCount})` : ''}`} />
-              <Stat label="주문 방식" value={t.autonomous || t.accountType === 'PAPER_TRADE' ? '자동 주문' : '주문 불가(조회·보고만)'} />
-              <Stat label="만든 주체" value={t.createdBy === 'AGENT' ? 'AI가 스스로 예약' : '사용자'} />
-            </dl>
-          </Section>
+          <TabBar
+            value={tab}
+            onChange={setTab}
+            items={[
+              { key: 'overview', label: '개요' },
+              { key: 'holdings', label: '보유·주문', count: openPositions.length },
+              { key: 'runs', label: '실행 기록', count: d.runs.length },
+              { key: 'settings', label: '지시·설정' },
+            ]}
+          />
 
-          {t.ledger && (
-            <Section title="시드와 손익">
-              <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
-                <Stat label="시드" value={formatMoney(t.ledger.budget, t.ledger.currency)} />
-                <Stat label="남은 예산" value={formatMoney(t.ledger.available, t.ledger.currency)} />
-                <Stat label="투자 중" value={formatMoney(t.ledger.invested, t.ledger.currency)} />
-                <Stat
-                  label="누적 손익"
-                  value={<PnL amount={t.ledger.totalPnl} rate={t.ledger.totalPnlPct} currency={t.ledger.currency} />}
-                />
-                <Stat label="실현 손익" value={formatMoney(t.ledger.realizedPnl, t.ledger.currency, { sign: true })} />
-                <Stat label="평가 손익" value={formatMoney(t.ledger.unrealizedPnl, t.ledger.currency, { sign: true })} />
-              </dl>
-              <p className="mt-2 text-xs text-subtle">
-                한도: 한 종목 {t.ledger.maxPositionPct != null ? `${formatRate(t.ledger.maxPositionPct, { sign: false, digits: 0 })}` : '-'} · 누적 손실{' '}
-                {t.ledger.maxLossPct != null ? formatRate(t.ledger.maxLossPct, { sign: false, digits: 0 }) : '-'} · 오늘 매수{' '}
-                {formatMoney(t.ledger.boughtToday, t.ledger.currency)} / {formatMoney(t.ledger.maxDailyBuy ?? t.ledger.budget, t.ledger.currency)}. 수수료·세금은 반영되지 않았습니다.
-              </p>
-            </Section>
-          )}
-
-          {(openPositions.length > 0 || closedPositions.length > 0) && (
-            <Section title="이 작업이 관리하는 종목">
-              {openPositions.length > 0 ? (
-                <ul className="divide-y divide-border">{openPositions.map((p) => <PositionRow key={p.id} p={p} />)}</ul>
-              ) : (
-                <p className="text-sm text-muted">지금 보유 중인 종목이 없습니다.</p>
+          {tab === 'overview' && (
+            <div role="tabpanel" id="agent-panel-overview" aria-labelledby="agent-tab-overview">
+              {t.ledger && (
+                <Section title="시드와 손익" action={editButton}>
+                  <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
+                    <Stat label="시드" value={formatMoney(t.ledger.budget, t.ledger.currency)} />
+                    <Stat label="남은 예산" value={formatMoney(t.ledger.available, t.ledger.currency)} />
+                    <Stat label="투자 중" value={formatMoney(t.ledger.invested, t.ledger.currency)} />
+                    <Stat label="누적 손익" value={<PnL amount={t.ledger.totalPnl} rate={t.ledger.totalPnlPct} currency={t.ledger.currency} />} />
+                    <Stat label="실현 손익" value={formatMoney(t.ledger.realizedPnl, t.ledger.currency, { sign: true })} />
+                    <Stat label="평가 손익" value={formatMoney(t.ledger.unrealizedPnl, t.ledger.currency, { sign: true })} />
+                  </dl>
+                  <p className="mt-2 text-xs text-subtle">
+                    한도: 한 종목 {t.ledger.maxPositionPct != null ? formatRate(t.ledger.maxPositionPct, { sign: false, digits: 0 }) : '-'} · 누적 손실{' '}
+                    {t.ledger.maxLossPct != null ? formatRate(t.ledger.maxLossPct, { sign: false, digits: 0 }) : '-'} · 오늘 매수{' '}
+                    {formatMoney(t.ledger.boughtToday, t.ledger.currency)} / {formatMoney(t.ledger.maxDailyBuy ?? t.ledger.budget, t.ledger.currency)}. 수수료·세금은 반영되지 않았습니다.
+                  </p>
+                </Section>
               )}
-              {closedPositions.length > 0 && (
-                <details className="mt-2 text-sm">
-                  <summary className="cursor-pointer select-none text-muted">정리된 종목 {closedPositions.length}건</summary>
-                  <ul className="divide-y divide-border">{closedPositions.map((p) => <PositionRow key={p.id} p={p} />)}</ul>
-                </details>
+
+              <Section title="진행 상황" action={!t.ledger ? editButton : undefined}>
+                <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
+                  <Stat label="계좌" value={t.accountLabel} />
+                  <Stat label="다음 실행" value={t.status === 'ACTIVE' && t.nextRunAt ? formatDateTime(t.nextRunAt) : '-'} />
+                  <Stat label="마지막 실행" value={t.lastRunAt ? formatDateTime(t.lastRunAt) : '아직 없음'} />
+                  <Stat label="실행 횟수" value={`${t.runCount}회${t.failCount > 0 ? ` (연속 실패 ${t.failCount})` : ''}`} />
+                  <Stat label="주문 방식" value={t.autonomous || t.accountType === 'PAPER_TRADE' ? '자동 주문' : '주문 불가(조회·보고만)'} />
+                  <Stat label="만든 주체" value={t.createdBy === 'AGENT' ? 'AI가 스스로 예약' : '사용자'} />
+                </dl>
+              </Section>
+
+              {t.lastResult && (
+                <Section title="최근 결과">
+                  <p className="line-clamp-3 whitespace-pre-line rounded-xl bg-surface-2 p-3 text-sm">{t.lastResult}</p>
+                  <button type="button" onClick={() => setTab('runs')} className="mt-1.5 text-xs font-medium text-brand-text hover:underline">
+                    실행 기록 보기 ({d.runs.length}건)
+                  </button>
+                </Section>
               )}
-            </Section>
+
+              {t.instruction && (
+                <Section title="지시 내용">
+                  <p className="line-clamp-4 whitespace-pre-wrap rounded-xl bg-surface-2 p-3 text-sm">{t.instruction}</p>
+                  <button type="button" onClick={() => setTab('settings')} className="mt-1.5 text-xs font-medium text-brand-text hover:underline">
+                    전체 보기{isLive && !t.skillId ? ' · 수정' : ''}
+                  </button>
+                </Section>
+              )}
+            </div>
           )}
 
-          {d.trades.length > 0 && (
-            <Section title="최근 주문">
-              <ul className="divide-y divide-border">{d.trades.slice(0, 15).map((x) => <TradeRow key={x.id} t={x} />)}</ul>
-            </Section>
+          {tab === 'holdings' && (
+            <div role="tabpanel" id="agent-panel-holdings" aria-labelledby="agent-tab-holdings">
+              {openPositions.length === 0 && closedPositions.length === 0 && d.trades.length === 0 && (
+                <p className="text-sm text-muted">아직 이 작업이 관리하는 종목이나 주문이 없어요.</p>
+              )}
+              {(openPositions.length > 0 || closedPositions.length > 0) && (
+                <Section title="이 작업이 관리하는 종목">
+                  {openPositions.length > 0 ? (
+                    <ul className="divide-y divide-border">{openPositions.map((p) => <PositionRow key={p.id} p={p} />)}</ul>
+                  ) : (
+                    <p className="text-sm text-muted">지금 보유 중인 종목이 없습니다.</p>
+                  )}
+                  {closedPositions.length > 0 && (
+                    <details className="mt-2 text-sm">
+                      <summary className="cursor-pointer select-none text-muted">정리된 종목 {closedPositions.length}건</summary>
+                      <ul className="divide-y divide-border">{closedPositions.map((p) => <PositionRow key={p.id} p={p} />)}</ul>
+                    </details>
+                  )}
+                </Section>
+              )}
+              {d.trades.length > 0 && (
+                <Section title="최근 주문">
+                  <ul className="divide-y divide-border">{d.trades.slice(0, 15).map((x) => <TradeRow key={x.id} t={x} />)}</ul>
+                </Section>
+              )}
+            </div>
           )}
 
-          <Section title="최근 실행 기록">
-            {d.runs.length === 0 ? (
-              <p className="text-sm text-muted">아직 기록된 실행이 없습니다. 아무 일도 없었던 점검은 기록하지 않습니다.</p>
-            ) : (
-              <ul className="divide-y divide-border">{d.runs.map((r) => <RunRow key={r.id} r={r} />)}</ul>
-            )}
-          </Section>
-
-          {(t.instruction || !t.skillId) && <InstructionSection task={t} revisions={d.revisions ?? []} />}
-
-          {d.memory && (
-            <Section title="AI가 남긴 메모">
-              <p className="whitespace-pre-wrap rounded-xl bg-surface-2 p-3 text-sm">{d.memory}</p>
-            </Section>
+          {tab === 'runs' && (
+            <div role="tabpanel" id="agent-panel-runs" aria-labelledby="agent-tab-runs">
+              <RunList runs={d.runs} />
+            </div>
           )}
 
-          {configRows(t, skill).length > 0 && (
-            <Section title="스킬 설정">
-              <dl className="grid grid-cols-1 gap-x-4 gap-y-1.5 text-sm sm:grid-cols-2">
-                {configRows(t, skill).map(([k, v]) => (
-                  <div key={k} className="flex justify-between gap-3 border-b border-border py-1.5">
-                    <dt className="text-muted">{k}</dt>
-                    <dd className="tabular text-right font-medium">{v}</dd>
-                  </div>
-                ))}
-              </dl>
-            </Section>
+          {tab === 'settings' && (
+            <div role="tabpanel" id="agent-panel-settings" aria-labelledby="agent-tab-settings">
+              {(t.instruction || !t.skillId) && <InstructionSection task={t} revisions={d.revisions ?? []} />}
+
+              {configRows(t, skill).length > 0 && (
+                <Section title="스킬 설정" action={editButton}>
+                  <dl className="grid grid-cols-1 gap-x-4 gap-y-1.5 text-sm sm:grid-cols-2">
+                    {configRows(t, skill).map(([k, v]) => (
+                      <div key={k} className="flex justify-between gap-3 border-b border-border py-1.5">
+                        <dt className="text-muted">{k}</dt>
+                        <dd className="tabular text-right font-medium">{v}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </Section>
+              )}
+
+              {d.memory && (
+                <Section title="AI가 남긴 메모">
+                  <p className="whitespace-pre-wrap rounded-xl bg-surface-2 p-3 text-sm">{d.memory}</p>
+                </Section>
+              )}
+            </div>
           )}
+
+          <TaskEditDialog task={t} skill={skill} open={editing} onClose={() => setEditing(false)} />
         </div>
       )}
     </Dialog>
