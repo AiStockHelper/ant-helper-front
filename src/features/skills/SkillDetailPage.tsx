@@ -10,78 +10,18 @@ import { EmptyState } from '@/components/finance/parts'
 import { AccountTypeBadge, Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/Dialog'
-import { Field, Segmented } from '@/components/ui/Field'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
 import { useAccounts } from '@/features/accounts/useAccounts'
 import { AgentTaskManager } from '@/features/agent/AgentTasks'
+import { ParamInput, configFromValues, initialValues, validateValues, type Values } from '@/features/skills/ParamFields'
 import { Markdown } from '@/features/chat/Markdown'
 import { cn } from '@/lib/cn'
-import { groupDigits, ungroup } from '@/lib/format'
-import type { Skill, SkillParam } from '@/api/types'
-
-type Values = Record<string, string | boolean>
-
-function initialValues(skill: Skill): Values {
-  const v: Values = {}
-  for (const p of skill.params) {
-    v[p.key] = p.type === 'BOOLEAN' ? Boolean(p.defaultValue) : p.defaultValue == null ? '' : String(p.defaultValue)
-  }
-  return v
-}
+import { groupDigits } from '@/lib/format'
+import type { Skill } from '@/api/types'
 
 // 시장을 바꾸면 시드 기본값도 그 통화에 맞는 값으로 바꿔 준다(사용자가 직접 고친 값은 건드리지 않는다).
 const BUDGET_DEFAULTS: Record<string, string> = { KRX: '5000000', US: '3000' }
-
-function ParamInput({ param, value, onChange, error }: { param: SkillParam; value: string | boolean; onChange: (v: string | boolean) => void; error?: string }) {
-  const range = param.min != null && param.max != null && param.type === 'NUMBER' ? `${param.min.toLocaleString()} ~ ${param.max >= 1e9 ? '제한 없음' : param.max.toLocaleString()}` : null
-  const hint = (
-    <>
-      {param.help}
-      {range && <span className="text-subtle"> (허용 범위 {range}{param.unit ? ` ${param.unit}` : ''})</span>}
-    </>
-  )
-  if (param.type === 'SELECT') {
-    return (
-      <div>
-        <p className="mb-1.5 text-sm font-medium">{param.label}</p>
-        <Segmented
-          label={param.label}
-          value={String(value)}
-          onChange={(v) => onChange(v)}
-          options={(param.options ?? []).map((o) => ({ value: o.value, label: o.label }))}
-        />
-        {param.help && <p className="mt-1.5 text-xs text-subtle">{param.help}</p>}
-      </div>
-    )
-  }
-  if (param.type === 'BOOLEAN') {
-    return (
-      <label className="flex min-h-[44px] cursor-pointer items-center gap-2.5 text-sm">
-        <input type="checkbox" checked={Boolean(value)} onChange={(e) => onChange(e.target.checked)} className="h-5 w-5 accent-[rgb(var(--brand))]" />
-        <span>
-          <span className="font-medium">{param.label}</span>
-          {param.help && <span className="block text-xs text-subtle">{param.help}</span>}
-        </span>
-      </label>
-    )
-  }
-  // 금액(시드)은 입력하는 동안에도 천 단위 쉼표가 보이게 한다. 상태에는 쉼표 없는 숫자만 보관한다.
-  const money = param.type === 'NUMBER' && param.key === 'budget'
-  return (
-    <Field
-      label={param.label + (param.required ? '' : ' (선택)')}
-      type={param.type === 'NUMBER' && !money ? 'number' : 'text'}
-      inputMode={money ? 'numeric' : param.type === 'NUMBER' ? 'decimal' : undefined}
-      step={param.type === 'NUMBER' && !money ? 'any' : undefined}
-      value={money ? groupDigits(String(value)) : String(value)}
-      onChange={(e) => onChange(money ? ungroup(e.target.value) : e.target.value)}
-      error={error}
-      hint={hint}
-      suffix={param.unit ? <span className="pr-2 text-xs text-subtle">{param.unit}</span> : undefined}
-    />
-  )
-}
 
 function StartForm({ skill }: { skill: Skill }) {
   const qc = useQueryClient()
@@ -113,30 +53,12 @@ function StartForm({ skill }: { skill: Skill }) {
   }
 
   const validate = () => {
-    const next: Record<string, string> = {}
-    for (const p of skill.params) {
-      const raw = values[p.key]
-      if (p.type === 'NUMBER') {
-        const n = Number(String(raw).replace(/,/g, ''))
-        if (String(raw).trim() === '' || Number.isNaN(n)) next[p.key] = '숫자를 입력해 주세요.'
-        else if (p.min != null && n < p.min) next[p.key] = `${p.min.toLocaleString()} 이상이어야 합니다.`
-        else if (p.max != null && n > p.max) next[p.key] = `${p.max.toLocaleString()} 이하여야 합니다.`
-      }
-    }
+    const next = validateValues(skill, values)
     setErrors(next)
     return Object.keys(next).length === 0
   }
 
-  const config = () => {
-    const c: Record<string, unknown> = {}
-    for (const p of skill.params) {
-      const raw = values[p.key]
-      if (p.type === 'NUMBER') c[p.key] = Number(String(raw).replace(/,/g, ''))
-      else if (p.type === 'BOOLEAN') c[p.key] = Boolean(raw)
-      else if (String(raw).trim() !== '') c[p.key] = String(raw).trim()
-    }
-    return c
-  }
+  const config = () => configFromValues(skill, values)
 
   const create = useMutation({
     mutationFn: (confirm: boolean) => agentApi.create({ accountId: accountId!, skillId: skill.id, config: config(), confirmRealTrading: confirm }),
