@@ -23,6 +23,13 @@ import type { Skill } from '@/api/types'
 // 시장을 바꾸면 시드 기본값도 그 통화에 맞는 값으로 바꿔 준다(사용자가 직접 고친 값은 건드리지 않는다).
 const BUDGET_DEFAULTS: Record<string, string> = { KRX: '5000000', US: '3000' }
 
+/** 시드 기본값의 통화를 정할 시장. market 선택이 있으면 그 값, 없으면 ETF 코드(6자리 숫자면 한국, 아니면 미국). */
+function budgetMarketOf(values: Values): 'KRX' | 'US' {
+  if (values.market === 'US' || values.market === 'KRX') return values.market
+  const etf = values.etf
+  if (typeof etf === 'string' && etf) return /^\d{6}$/.test(etf) ? 'KRX' : 'US'
+  return 'KRX'
+}
 function StartForm({ skill }: { skill: Skill }) {
   const qc = useQueryClient()
   const toast = useToast()
@@ -44,8 +51,8 @@ function StartForm({ skill }: { skill: Skill }) {
   const set = (key: string, v: string | boolean) => {
     setValues((prev) => {
       const next = { ...prev, [key]: v }
-      if (key === 'market' && 'budget' in prev && Object.values(BUDGET_DEFAULTS).includes(String(prev.budget))) {
-        next.budget = BUDGET_DEFAULTS[String(v)] ?? prev.budget
+      if ((key === 'market' || key === 'etf') && 'budget' in prev && Object.values(BUDGET_DEFAULTS).includes(String(prev.budget))) {
+        next.budget = BUDGET_DEFAULTS[budgetMarketOf(next)] ?? prev.budget
       }
       return next
     })
@@ -100,7 +107,7 @@ function StartForm({ skill }: { skill: Skill }) {
     )
   }
 
-  const budgetText = skill.params.some((p) => p.key === 'budget') ? `${values.budget ? groupDigits(String(values.budget)) : '-'}${values.market === 'US' ? '달러' : '원'}` : null
+  const budgetText = skill.params.some((p) => p.key === 'budget') ? `${values.budget ? groupDigits(String(values.budget)) : '-'}${budgetMarketOf(values) === 'US' ? '달러' : '원'}` : null
 
   return (
     <div className="space-y-4">
