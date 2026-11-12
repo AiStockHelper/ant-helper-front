@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Bot, ChevronDown, MessageSquare, Pause, Pencil, Play, Plus, Square, Zap } from 'lucide-react'
+import { Bot, ChevronDown, MessageSquare, Pause, Pencil, Play, Plus, RefreshCw, Square, Zap } from 'lucide-react'
 import { agentApi, skillsApi } from '@/api/endpoints'
 import { errorMessage } from '@/api/client'
 import { AgentStatusBadge, EmptyState, MarketBadge, PnL, SideBadge, Stat } from '@/components/finance/parts'
@@ -70,6 +70,33 @@ export function AgentTaskList({
   )
 }
 
+/**
+ * 한국투자증권 앱 등 이 앱 밖에서 직접 매매한 것을 자동 실행 장부에 반영한다(taskId 를 주면 그 작업만).
+ * 서버도 10분마다 스스로 맞추지만, 방금 한 매매를 바로 보고 싶을 때 쓴다.
+ */
+function useSync(taskId?: number) {
+  const qc = useQueryClient()
+  const toast = useToast()
+  return useMutation({
+    mutationFn: () => agentApi.sync(taskId),
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: ['agent'] })
+      qc.invalidateQueries({ queryKey: ['summary'] })
+      toast.success(r.lines.length > 0 ? `앱 밖에서 직접 매매한 내역 ${r.lines.length}건을 장부에 반영했어요.` : '이미 증권사 계좌와 같아요.')
+    },
+    onError: (e) => toast.error(errorMessage(e)),
+  })
+}
+
+function SyncButton({ taskId, label = '계좌와 동기화' }: { taskId?: number; label?: string }) {
+  const sync = useSync(taskId)
+  return (
+    <Button size="sm" variant="outline" onClick={() => sync.mutate()} loading={sync.isPending} title="한국투자증권 앱 등에서 직접 매매한 내역을 반영해요">
+      <RefreshCw className="h-3.5 w-3.5" aria-hidden /> {label}
+    </Button>
+  )
+}
+
 /** 일시정지·재개·지금 실행·중지·상세를 모두 제공하는 관리용 목록 */
 export function AgentTaskManager({ tasks, showAccount }: { tasks: AgentTask[]; showAccount?: boolean }) {
   const qc = useQueryClient()
@@ -119,6 +146,12 @@ export function AgentTaskManager({ tasks, showAccount }: { tasks: AgentTask[]; s
 
   return (
     <>
+      {tasks.some((t) => live(t) && t.ledger && t.ledger.openPositions > 0) && (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-2.5">
+          <p className="min-w-0 flex-1 text-xs text-subtle">한국투자증권 앱에서 직접 사고판 내용은 10분마다 자동으로 반영돼요. 바로 보려면 눌러 주세요.</p>
+          <SyncButton />
+        </div>
+      )}
       <AgentTaskList
         tasks={tasks}
         showAccount={showAccount}
@@ -655,7 +688,17 @@ export function AgentTaskDetailDialog({ id, onClose }: { id: number | null; onCl
           {tab === 'overview' && (
             <div role="tabpanel" id="agent-panel-overview" aria-labelledby="agent-tab-overview">
               {t.ledger && (
-                <Section title="시드와 손익" action={editButton}>
+                <Section
+                  title="시드와 손익"
+                  action={
+                    (isLive || editButton) && (
+                      <div className="flex gap-1.5">
+                        {isLive && <SyncButton taskId={t.id} label="동기화" />}
+                        {editButton}
+                      </div>
+                    )
+                  }
+                >
                   <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
                     <Stat label="시드" value={formatMoney(t.ledger.budget, t.ledger.currency)} />
                     <Stat label="남은 예산" value={formatMoney(t.ledger.available, t.ledger.currency)} />

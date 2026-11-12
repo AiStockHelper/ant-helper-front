@@ -19,6 +19,7 @@ import type {
   PageResponse,
   AgentTask,
   AgentTaskDetail,
+  AgentSyncResult,
   CreateAgentTaskRequest,
   UpdateAgentTaskRequest,
   Skill,
@@ -79,6 +80,8 @@ export const agentApi = {
   cancel: (id: number) => api.delete<AgentTask>(`/agent/tasks/${id}`),
   /** 걸어 둔 지시(정리본)·제목 수정. mode=APPEND 면 기존 정리본 뒤에 추가 지시로 덧붙인다. */
   update: (id: number, body: UpdateAgentTaskRequest) => api.patch<AgentTask>(`/agent/tasks/${id}`, body),
+  /** 한국투자증권 앱 등 앱 밖에서 직접 매매한 것을 자동 실행 장부에 반영한다. id 를 주면 그 작업만, 아니면 전체. */
+  sync: (id?: number) => api.post<AgentSyncResult>(id != null ? `/agent/tasks/${id}/sync` : '/agent/sync'),
   pauseAll: () => api.post<{ paused: number }>('/agent/pause-all'),
 }
 export const orderQueueApi = {
