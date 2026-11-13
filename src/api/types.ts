@@ -95,6 +95,19 @@ export interface Holding {
   profitLossRate: number
 }
 
+/** 기준 자산(원금) 대비 손익. 기준 자산은 처음 조회한 시점의 총자산이 자동으로 정해지고, 직접 바꿀 수도 있다. */
+export interface BaselineInfo {
+  /** 기준 자산 */
+  amount: number
+  at: string
+  /** true 면 사용자가 직접 정한 값, false 면 처음 조회한 시점의 총자산 */
+  manual: boolean
+  /** 현재 총자산 − 기준 자산 */
+  pnl: number
+  /** pnl ÷ 기준 자산 (%) */
+  pnlRate: number
+}
+
 export interface AccountSummary {
   accountId: number
   cash: number
@@ -109,6 +122,8 @@ export interface AccountSummary {
   overseas?: MarketSummary | null
   /** USD/KRW 참고 환율 */
   exchangeRate?: number | null
+  /** 국내(KRW) 기준 자산 대비 손익. 아직 기준이 없으면 null */
+  baseline?: BaselineInfo | null
 }
 
 export interface MarketSummary {
@@ -120,6 +135,7 @@ export interface MarketSummary {
   profitLoss: number
   profitLossRate: number
   holdings: Holding[]
+  baseline?: BaselineInfo | null
 }
 
 export type OrderSide = 'BUY' | 'SELL'
@@ -138,6 +154,12 @@ export interface OrderHistoryItem {
   executedQuantity: number
   averageExecutedPrice: number
   status: OrderStatus
+  /** 체결금액(평균 체결가 × 체결 수량) */
+  executedAmount?: number | null
+  /** 매도일 때: 그때까지의 평균 매입단가, 실현손익, 손익률(%). 원가(매수 기록)를 알 수 없으면 null. 수수료·세금 제외 */
+  costPrice?: number | null
+  realizedPnl?: number | null
+  realizedPnlRate?: number | null
 }
 
 // ── 종목 ──────────────────────────────────────────
@@ -417,6 +439,10 @@ export interface AgentTrade {
   amount: number
   reason?: string | null
   createdAt: string
+  /** 매도일 때: 평균 매입단가, 실현손익(수수료·세금 제외), 손익률(%) */
+  costPrice?: number | null
+  realizedPnl?: number | null
+  realizedPnlPct?: number | null
 }
 
 export interface AgentRun {
