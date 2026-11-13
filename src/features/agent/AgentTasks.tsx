@@ -12,7 +12,7 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { useToast } from '@/components/ui/Toast'
 import { TaskEditDialog } from '@/features/agent/TaskEditDialog'
 import { cn } from '@/lib/cn'
-import { formatDateTime, formatMoney, formatRate } from '@/lib/format'
+import { formatDateTime, formatMoney, formatRate, priceTone, toneClass } from '@/lib/format'
 import type { AgentPosition, AgentRevision, AgentRun, AgentTask, AgentTrade, Skill } from '@/api/types'
 
 const live = (t: AgentTask) => t.status === 'ACTIVE' || t.status === 'RUNNING' || t.status === 'PAUSED'
@@ -295,6 +295,11 @@ function TradeRow({ t }: { t: AgentTrade }) {
       </div>
       <div className="shrink-0 text-right">
         <div className="tabular text-xs font-semibold">{formatMoney(t.price, t.currency)}</div>
+        {t.side === 'SELL' && t.realizedPnl != null && t.realizedPnlPct != null && (
+          <div className={cn('tabular text-xs font-semibold', toneClass(priceTone(t.realizedPnl)))}>
+            {formatMoney(t.realizedPnl, t.currency, { sign: true })} ({formatRate(t.realizedPnlPct)})
+          </div>
+        )}
         <div className="tabular text-[11px] text-subtle">{formatDateTime(t.createdAt)}</div>
       </div>
     </li>

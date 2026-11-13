@@ -46,6 +46,8 @@ export const accountsApi = {
   update: (id: number, body: { alias?: string; isDefault?: boolean }) => api.patch<Account>(`/accounts/${id}`, body),
   remove: (id: number) => api.delete<void>(`/accounts/${id}`),
   summary: (id: number) => api.get<AccountSummary>(`/accounts/${id}/summary`),
+  /** amount 가 null 이면 기준 자산을 지워서, 다음 조회 때 그 시점의 총자산이 새 기준이 된다. */
+  setBaseline: (id: number, body: { currency: 'KRW' | 'USD'; amount: number | null }) => api.put<void>(`/accounts/${id}/baseline`, body),
   orders: (id: number, p: { from: string; to: string; page: number; size: number; scope?: OrderScope }) =>
     api.get<PageResponse<OrderHistoryItem>>(
       `/accounts/${id}/orders?from=${p.from}&to=${p.to}&page=${p.page}&size=${p.size}&scope=${p.scope ?? 'DOMESTIC'}`,
