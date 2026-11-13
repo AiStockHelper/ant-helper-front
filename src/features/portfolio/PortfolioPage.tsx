@@ -7,7 +7,7 @@ import { errorMessage } from '@/api/client'
 import { AccountSelect } from '@/components/AccountSelect'
 import { PageBody, PageHeader } from '@/components/PageHeader'
 import { AllocationDonut } from '@/components/finance/AllocationDonut'
-import { HoldingsList, OrderList } from '@/components/finance/Lists'
+import { HoldingsList, OrderList, RealizedStrip } from '@/components/finance/Lists'
 import { EmptyState, ORDER_STATUS_LABEL, PnL } from '@/components/finance/parts'
 import { AccountTypeBadge, Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
@@ -79,7 +79,7 @@ function Overview({ accountId }: { accountId: number }) {
       <Card className="p-5">
         <SectionTitle aside={<Badge>국내 · KRW</Badge>}>국내 주식</SectionTitle>
         <div className="mt-3">
-          <SummaryBlock totals={s} currency="KRW" />
+          <SummaryBlock totals={s} currency="KRW" baseline={s.baseline} accountId={accountId} />
         </div>
       </Card>
       <Card title="보유 비중 · 국내" className="p-0">
@@ -101,7 +101,7 @@ function Overview({ accountId }: { accountId: number }) {
               해외 주식
             </SectionTitle>
             <div className="mt-3">
-              <SummaryBlock totals={o} currency="USD" />
+              <SummaryBlock totals={o} currency="USD" baseline={o.baseline} accountId={accountId} />
             </div>
           </Card>
           <Card title="보유 비중 · 해외" className="p-0">
@@ -274,6 +274,7 @@ function Orders({ accountId }: { accountId: number }) {
         <QueryError error={q.error} onRetry={() => q.refetch()} />
       ) : (
         <>
+          <RealizedStrip orders={items} currency={scope === 'OVERSEAS' ? 'USD' : 'KRW'} />
           <OrderList orders={items} />
           {q.hasNextPage && (
             <div className="border-t border-border p-3 text-center">
